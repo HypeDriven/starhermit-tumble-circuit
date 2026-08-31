@@ -1,0 +1,20 @@
+[
+  { "name": "ui-click", "seconds": 1, "prompt": "Short soft plastic button click, crisp and dry, subtle high tick", "event": "ui" },
+  { "name": "ui-back", "seconds": 1, "prompt": "Muted reverse UI swipe, quick downward woody tap, gentle and short", "event": "ui-back" },
+  { "name": "invalid-buzz", "seconds": 1, "prompt": "Low raspy double buzzer buzz, wrong-answer error tone, short and flat", "event": "invalid" },
+  { "name": "countdown-beep", "seconds": 1, "prompt": "Clean single electronic timer beep, mid pitch, precise and short", "event": "countdown" },
+  { "name": "go-whistle", "seconds": 1, "prompt": "Bright rising referee whistle blast with energetic tail, race start signal", "event": "go" },
+  { "name": "jump-hop", "seconds": 1, "prompt": "Springy cartoon hop, quick upward rubbery bounce with light shoe scuff", "event": "jump" },
+  { "name": "dive-whoosh", "seconds": 1, "prompt": "Fast airy whoosh of a body diving forward through wind, short swoosh", "event": "dive" },
+  { "name": "land-thud", "seconds": 1, "prompt": "Soft heavy thud of sneakers landing on padded foam platform, low thump", "event": "land" },
+  { "name": "bounce-boing", "seconds": 1, "prompt": "Big rubber ball boing, elastic trampoline rebound, playful rising twang", "event": "bounce" },
+  { "name": "knock-hit", "seconds": 1, "prompt": "Punchy padded impact hit, foam bat smacking a body, dull heavy whack", "event": "knock" },
+  { "name": "fall-whoosh", "seconds": 2, "prompt": "Descending airy falling whoosh, wind rushing past with dropping pitch", "event": "fall" },
+  { "name": "respawn-sparkle", "seconds": 1, "prompt": "Shimmering magical teleport sparkle, quick bright glittery shimmer", "event": "respawn" },
+  { "name": "checkpoint-chime", "seconds": 1, "prompt": "Bright two-tone bell chime, clear ringing ding-ding checkpoint confirmation", "event": "checkpoint" },
+  { "name": "finish-fanfare", "seconds": 2, "prompt": "Short ascending brass fanfare, four triumphant notes with tambourine hit", "event": "finish" },
+  { "name": "out-eliminated", "seconds": 2, "prompt": "Sad descending trombone womp, comical elimination deflate, two falling notes", "event": "out" },
+  { "name": "round-end-sting", "seconds": 2, "prompt": "Three-note orchestral brass sting with cymbal swell, round conclusion accent", "event": "round-end" },
+  { "name": "champion-fanfare", "seconds": 3, "prompt": "Triumphant victory fanfare, full brass section with timpani and crowd cheer swell", "event": "champion" },
+  { "name": "achievement-chime", "seconds": 1, "prompt": "Sparkling achievement unlock chime, bright glockenspiel arpeggio with shimmer tail", "event": "achievement" }
+]

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1a2440">
+<title>Tumble Circuit — sky arena obstacle race</title>
+<meta name="description" content="Race through kinetic sky courses, survive eliminations, reach the final.">
+<link rel="stylesheet" href="css/main.css">
+<link rel="icon" href="assets/icon.svg" type="image/svg+xml">
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js" } }</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="gl" aria-hidden="true"></canvas>
+
+  <!-- In-game HUD (semantic layer over the canvas) -->
+  <header id="hud" class="hidden" aria-label="Round status">
+    <div id="hud-objective">
+      <h2 id="hud-title">Course</h2>
+      <p id="hud-goal">Reach the finish</p>
+    </div>
+    <div id="hud-center">
+      <div id="hud-clock" role="timer" aria-label="Time remaining">0:00.00</div>
+      <div id="hud-place" aria-label="Current place">—</div>
+    </div>
+    <div id="hud-right">
+      <div id="hud-progress" role="progressbar" aria-label="Course progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div id="hud-progress-fill"></div>
+      </div>
+      <div id="hud-quota" aria-label="Qualification cutoff"></div>
+    </div>
+    <button id="btn-pause" class="icon-btn" aria-label="Pause" title="Pause (Esc)">II</button>
+  </header>
+
+  <!-- Lesson step banner -->
+  <div id="lesson-banner" class="hidden" role="status" aria-live="polite"></div>
+
+  <!-- Countdown -->
+  <div id="countdown" class="hidden" aria-hidden="true"></div>
+
+  <!-- Touch controls -->
+  <div id="touch-ui" class="hidden" aria-label="Touch controls">
+    <div id="stick-zone" aria-hidden="true"><div id="stick-base"><div id="stick-nub"></div></div></div>
+    <div id="touch-actions">
+      <button id="btn-jump" class="touch-btn" aria-label="Jump">Jump</button>
+      <button id="btn-dive" class="touch-btn" aria-label="Dive">Dive</button>
+    </div>
+  </div>
+
+  <!-- Screen root: menus & overlays are rendered here as semantic HTML -->
+  <main id="screens"></main>
+
+  <!-- Announcements for assistive tech -->
+  <div id="live" class="visually-hidden" aria-live="polite"></div>
+  <div id="live-urgent" class="visually-hidden" aria-live="assertive"></div>
+
+  <!-- Captions / text cues for meaningful audio -->
+  <div id="captions" class="hidden" aria-hidden="false"></div>
+
+  <noscript><p style="color:#fff;padding:2rem">Tumble Circuit needs JavaScript to run.</p></noscript>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "tumble-circuit",
+  "version": "1.0.0",
+  "description": "Tumble Circuit — realtime sky-arena obstacle race. Browser distribution.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node tests/run.mjs",
+    "serve": "node server.js",
+    "validate": "node tests/run.mjs --validate-only",
+    "smoke:ws": "node tests/ws-smoke.mjs",
+    "smoke:browser": "node tests/browser-smoke.mjs"
+  }
+}

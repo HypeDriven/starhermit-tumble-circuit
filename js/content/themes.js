@@ -1,0 +1,73 @@
+// Five visual themes. Themes alter sky, light, palettes, ambience and music
+// — never hitboxes, timing or information (cosmetic by contract).
+
+export const THEMES = {
+  cumulus: {
+    id: 'cumulus', name: 'Cumulus Carnival',
+    sky: { top: 0x3d8fe0, horizon: 0xbfe6ff, ground: 0x7fb7d9 },
+    fog: { color: 0xcfe9f7, density: 0.0038 },
+    sun: { color: 0xfff3d6, intensity: 2.6, pos: [18, 30, 12] },
+    hemi: { sky: 0xbfe0ff, ground: 0x8a9bb0, intensity: 0.9 },
+    platform: { top: 0xfdf3e0, side: 0xe8b7c9, edge: 0xff8fab, under: 0x9c6d8e },
+    accent: 0xffd166, hazard: 0xef476f, checkpoint: 0x06d6a0, finish: 0xffd166,
+    obstacle: { bar: 0xef476f, pole: 0x8338ec, bob: 0xff9f1c, block: 0x3a86ff, bumper: 0x06d6a0 },
+    decor: ['cloud', 'balloon', 'island'],
+    music: { root: 261.63, scale: [0, 2, 4, 7, 9], bpm: 112, bright: 1.0, pad: 'warm' },
+    ambience: 'breeze',
+  },
+  dawn: {
+    id: 'dawn', name: 'Dawn Drift',
+    sky: { top: 0x4a3f8f, horizon: 0xffb27d, ground: 0x6e4a7a },
+    fog: { color: 0xf0c39b, density: 0.0042 },
+    sun: { color: 0xffc890, intensity: 2.3, pos: [-22, 14, 18] },
+    hemi: { sky: 0xd9a0c0, ground: 0x5a4a6a, intensity: 0.75 },
+    platform: { top: 0xf7e8d0, side: 0xc9708a, edge: 0xff8c69, under: 0x7a4a66 },
+    accent: 0xffe066, hazard: 0xe84a5f, checkpoint: 0x2ec4b6, finish: 0xffe066,
+    obstacle: { bar: 0xe84a5f, pole: 0x583563, bob: 0xff9f1c, block: 0x2ec4b6, bumper: 0xffb27d },
+    decor: ['cloud', 'island', 'kite'],
+    music: { root: 220.0, scale: [0, 2, 3, 7, 8], bpm: 96, bright: 0.8, pad: 'dusk' },
+    ambience: 'warm-wind',
+  },
+  nimbus: {
+    id: 'nimbus', name: 'Nimbus Night',
+    sky: { top: 0x0c1445, horizon: 0x3a5ba8, ground: 0x1a2440 },
+    fog: { color: 0x2a3a66, density: 0.0046 },
+    sun: { color: 0xbfd0ff, intensity: 1.5, pos: [10, 26, -14] },
+    hemi: { sky: 0x4a5a9a, ground: 0x1c2438, intensity: 0.6 },
+    platform: { top: 0xdfe6f5, side: 0x5a6ba8, edge: 0x8fb8ff, under: 0x2c3a66 },
+    accent: 0x8fb8ff, hazard: 0xff5d8f, checkpoint: 0x4ce0b3, finish: 0x8fb8ff,
+    obstacle: { bar: 0xff5d8f, pole: 0x4ce0b3, bob: 0xf9c74f, block: 0x8fb8ff, bumper: 0x4ce0b3 },
+    decor: ['cloud', 'star', 'island'],
+    music: { root: 196.0, scale: [0, 3, 5, 7, 10], bpm: 88, bright: 0.6, pad: 'night' },
+    ambience: 'night-air',
+  },
+  storm: {
+    id: 'storm', name: 'Storm Surge',
+    sky: { top: 0x14424e, horizon: 0x7fd1c0, ground: 0x1e3a44 },
+    fog: { color: 0x5e9a94, density: 0.005 },
+    sun: { color: 0xd0fff0, intensity: 1.9, pos: [-14, 24, 10] },
+    hemi: { sky: 0x7fb8b0, ground: 0x24404a, intensity: 0.7 },
+    platform: { top: 0xe8f2ec, side: 0x4a7a7e, edge: 0x58e0c0, under: 0x2a4a50 },
+    accent: 0x58e0c0, hazard: 0xff6b5e, checkpoint: 0xf9c74f, finish: 0x58e0c0,
+    obstacle: { bar: 0xff6b5e, pole: 0x2a9d8f, bob: 0xf9c74f, block: 0x58e0c0, bumper: 0xf9c74f },
+    decor: ['cloud', 'storm', 'island'],
+    music: { root: 233.08, scale: [0, 2, 3, 7, 10], bpm: 124, bright: 0.9, pad: 'storm' },
+    ambience: 'storm-wind',
+  },
+  aurora: {
+    id: 'aurora', name: 'Aurora Heights',
+    sky: { top: 0x1a0f3d, horizon: 0x3ddc97, ground: 0x241a4a },
+    fog: { color: 0x3a2f66, density: 0.0042 },
+    sun: { color: 0xd0e8ff, intensity: 1.8, pos: [16, 28, -10] },
+    hemi: { sky: 0x6a5aaa, ground: 0x2a2450, intensity: 0.65 },
+    platform: { top: 0xf0eaff, side: 0x6a5aaa, edge: 0xb892ff, under: 0x3a2f66 },
+    accent: 0x3ddc97, hazard: 0xff5d8f, checkpoint: 0x3ddc97, finish: 0xb892ff,
+    obstacle: { bar: 0xff5d8f, pole: 0x3ddc97, bob: 0xffd166, block: 0xb892ff, bumper: 0x3ddc97 },
+    decor: ['cloud', 'aurora', 'island', 'star'],
+    music: { root: 246.94, scale: [0, 2, 4, 6, 7, 11], bpm: 104, bright: 1.1, pad: 'aurora' },
+    ambience: 'high-air',
+  },
+};
+
+export const THEME_IDS = Object.keys(THEMES);
+export function themeById(id) { return THEMES[id] || THEMES.cumulus; }
