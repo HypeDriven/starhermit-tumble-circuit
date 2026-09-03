@@ -33,14 +33,11 @@ async function boot() {
   app.start();
 
   // host handshake: synchronize the daily boundary clock; offline is fine.
-  // The /api/v1/time probe doubles as the hosted check: hosted-only routes
-  // (telemetry etc.) must never be requested when it failed.
+  // GET /api/v1/time is the only hosted route guaranteed to exist; telemetry
+  // and other hosted-only routes are not deployed, so nothing else is
+  // requested here — funnel events stay local no-ops.
   syncTime().then((r) => {
-    if (!r.ok) { console.info('time sync unavailable:', r.reason); return; }
-    // funnel telemetry: anonymous, aggregate-only categories, no content
-    try {
-      if (navigator.sendBeacon) navigator.sendBeacon('/api/v1/telemetry', JSON.stringify({ kind: 'start', ts: Date.now() }));
-    } catch {}
+    if (!r.ok) console.info('time sync unavailable:', r.reason);
   });
 }
 
