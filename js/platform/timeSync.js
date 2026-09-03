@@ -20,9 +20,11 @@ export async function syncTime(fetchImpl = fetch) {
       return { ok: false, reason };
     }
     const body = await res.json();
-    if (typeof body.ms !== 'number') throw new Error('bad time payload');
+    // Hosts expose the epoch under different keys (`ms`, `now`, `serverTime`, `epochMs`).
+    const serverMs = Number(body.ms ?? body.now ?? body.serverTime ?? body.epochMs);
+    if (!Number.isFinite(serverMs)) throw new Error('bad time payload');
     const rtt = t1 - t0;
-    offsetMs = body.ms - (t0 + rtt / 2);
+    offsetMs = serverMs - (t0 + rtt / 2);
     syncedAt = Date.now();
     failed = false;
     return { ok: true, rtt };

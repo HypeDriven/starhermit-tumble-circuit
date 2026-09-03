@@ -32,15 +32,16 @@ async function boot() {
   const app = new App({ scene, audio, store, hosted });
   app.start();
 
-  // host handshake: synchronize the daily boundary clock; offline is fine
-  syncTime().then((r) => { if (!r.ok) console.info('time sync unavailable:', r.reason); });
-
-  // funnel telemetry: anonymous, aggregate-only categories, no content
-  const tel = (kind) => {
-    if (!navigator.sendBeacon) return;
-    try { navigator.sendBeacon('/api/v1/telemetry', JSON.stringify({ kind, ts: Date.now() })); } catch {}
-  };
-  tel('start');
+  // host handshake: synchronize the daily boundary clock; offline is fine.
+  // The /api/v1/time probe doubles as the hosted check: hosted-only routes
+  // (telemetry etc.) must never be requested when it failed.
+  syncTime().then((r) => {
+    if (!r.ok) { console.info('time sync unavailable:', r.reason); return; }
+    // funnel telemetry: anonymous, aggregate-only categories, no content
+    try {
+      if (navigator.sendBeacon) navigator.sendBeacon('/api/v1/telemetry', JSON.stringify({ kind: 'start', ts: Date.now() }));
+    } catch {}
+  });
 }
 
 boot().catch(e => { console.error(e); fatal('Unexpected boot error: ' + e.message); });
