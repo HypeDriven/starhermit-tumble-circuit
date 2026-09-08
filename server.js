@@ -23,6 +23,9 @@ const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json',
   '.svg': 'image/svg+xml', '.png': 'image/png', '.txt': 'text/plain',
+  '.ico': 'image/x-icon', '.webmanifest': 'application/manifest+json',
+  '.opus': 'audio/ogg', '.ogg': 'audio/ogg', '.wav': 'audio/wav', '.mp3': 'audio/mpeg',
+  '.woff2': 'font/woff2', '.glb': 'model/gltf-binary',
 };
 
 // ---------------------------------------------------------------------------
@@ -48,10 +51,12 @@ const server = http.createServer((req, res) => {
     return;
   }
   // static
-  let p = decodeURIComponent(url.pathname);
+  let p;
+  try { p = decodeURIComponent(url.pathname); }
+  catch { res.writeHead(400); res.end('bad path'); return; }
   if (p === '/') p = '/index.html';
   const file = path.normalize(path.join(ROOT, p));
-  if (!file.startsWith(ROOT) || file.includes(`${path.sep}.`)) {
+  if (!file.startsWith(ROOT + path.sep) || file.includes(`${path.sep}.`)) {
     res.writeHead(403); res.end('forbidden'); return;
   }
   fs.readFile(file, (err, data) => {
@@ -165,7 +170,7 @@ class Room {
   addClient(sock, playerId) {
     if (this.clients.size >= 32) return null;
     const id = playerId && this.clients.has(playerId) ? playerId : 'p' + crypto.randomInt(1e6).toString(36);
-    this.clients.set(id, { sock, name: 'Player ' + id.slice(1, 5), ready: false });
+    this.clients.set(id, { sock, name: 'Player ' + id.slice(1, 5), ready: false, rejoinToken: crypto.randomBytes(24).toString('hex') });
     if (!this.aliveIds.includes(id)) this.aliveIds.push(id);
     return id;
   }
@@ -234,7 +239,7 @@ class Room {
 
   handleInput(playerId, dv) {
     if (!this.state || this.state.phase !== 'active') return;
-    // rate limit: max 240 input frames/s per player
+    // rate limit: max 300 input frames/s per player
     const now = Date.now();
     const rc = this.cmdCounts.get(playerId) || { t: now, n: 0 };
     if (now - rc.t > 1000) { rc.t = now; rc.n = 0; }
@@ -276,7 +281,7 @@ server.on('upgrade', (req, sock) => {
           room = new Room(typeof msg.showId === 'string' ? msg.showId : 'show-quick');
           rooms.set(room.code, room);
           playerId = room.addClient(sock, null);
-          send({ t: 'joined', code: room.code, playerId, players: room.clients.size });
+          send({ t: 'joined', code: room.code, playerId, rejoinToken: room.clients.get(playerId).rejoinToken, players: room.clients.size });
           room.broadcast(room.lobby());
           break;
         }
@@ -291,16 +296,16 @@ server.on('upgrade', (req, sock) => {
           }
           playerId = room.addClient(sock, null);
           if (!playerId) { send({ t: 'error', error: 'room full' }); room = null; return; }
-          send({ t: 'joined', code: room.code, playerId, players: room.clients.size });
+          send({ t: 'joined', code: room.code, playerId, rejoinToken: room.clients.get(playerId).rejoinToken, players: room.clients.size });
           room.broadcast(room.lobby());
           break;
         }
         case 'rejoin': {
           const r = rooms.get(String(msg.code || '').toUpperCase());
-          if (r && r.clients.has(msg.playerId)) {
+          if (r && typeof msg.rejoinToken === 'string' && r.clients.get(msg.playerId)?.rejoinToken === msg.rejoinToken) {
             room = r; playerId = msg.playerId;
             r.clients.get(playerId).sock = sock;
-            send({ t: 'joined', code: r.code, playerId, players: r.clients.size });
+            send({ t: 'joined', code: r.code, playerId, rejoinToken: r.clients.get(playerId).rejoinToken, players: r.clients.size });
             // fresh snapshot after reconnect
             if (r.state) {
               send({ t: 'start', courseId: r.courseDef.id, quota: r.quota, roster: r.state.players.map(p => ({ id: p.id, name: p.name, color: p.color, isBot: p.isBot })) });
@@ -309,19 +314,19 @@ server.on('upgrade', (req, sock) => {
           } else send({ t: 'error', error: 'cannot rejoin' });
           break;
         }
-        case 'ready': if (room && playerId) { room.clients.get(playerId).ready = !!msg.ready; room.broadcast(room.lobby()); room.maybeStart(); } break;
+        case 'ready': if (room && playerId && room.clients.get(playerId)?.sock === sock) { room.clients.get(playerId).ready = !!msg.ready; room.broadcast(room.lobby()); room.maybeStart(); } break;
         case 'leave': cleanup(); break;
       }
       return;
     }
     // binary input frame: [1][tick u32][mx][mz][buttons][seq u16]
-    if (payload.length === 10 && payload[0] === 1 && room && playerId) {
+    if (payload.length === 10 && payload[0] === 1 && room && playerId && room.clients.get(playerId)?.sock === sock) {
       room.handleInput(playerId, payload);
     }
   };
 
   const cleanup = () => {
-    if (room && playerId && room.clients.has(playerId)) {
+    if (room && playerId && room.clients.get(playerId)?.sock === sock) {
       room.clients.delete(playerId);
       room.aliveIds = room.aliveIds.filter(id => id !== playerId);
       room.broadcast(room.lobby());
@@ -342,3 +347,5 @@ server.on('upgrade', (req, sock) => {
 server.listen(PORT, () => {
   console.log(`Tumble Circuit host on http://localhost:${PORT}`);
 });
+
+export { server };

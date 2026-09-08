@@ -45,7 +45,7 @@ export class HostedClient {
     if (this.roomCode && this.reconnectAttempts < 5) {
       this.reconnectAttempts++;
       setTimeout(() => {
-        this.connect().then(() => this.send({ op: 'rejoin', code: this.roomCode, playerId: this.playerId }))
+        this.connect().then(() => this.send({ op: 'rejoin', code: this.roomCode, playerId: this.playerId, rejoinToken: this.rejoinToken }))
           .catch(() => {});
       }, 500 * this.reconnectAttempts);
     }
@@ -55,7 +55,7 @@ export class HostedClient {
     if (typeof m.data === 'string') {
       let msg;
       try { msg = JSON.parse(m.data); } catch { return; }
-      if (msg.t === 'joined') { this.roomCode = msg.code; this.playerId = msg.playerId; this.reconnectAttempts = 0; }
+      if (msg.t === 'joined') { this.roomCode = msg.code; this.playerId = msg.playerId; this.rejoinToken = msg.rejoinToken; this.reconnectAttempts = 0; }
       this.onEvent(msg);
     }
   }

@@ -66,7 +66,8 @@ export class App {
 
     if (this.round) {
       const evs = this.round.update(document.hidden ? 0 : dt);
-      const lessonEv = this.round.pollLessonInput();
+      // lesson "hold forward" steps must not tick while the round is paused
+      const lessonEv = this.round.paused ? null : this.round.pollLessonInput();
       if (lessonEv) evs.push(lessonEv);
       for (const e of evs) this.handleRoundEvent(e);
       if (this.round.invalidFlash) {
@@ -97,7 +98,11 @@ export class App {
       const k = e.key.toLowerCase();
       this.keys[k] = true;
       if (k === 'escape' || k === 'p') { this.togglePause(); e.preventDefault(); }
-      if (this.round && (k === ' ' || k === 'arrowup' || k === 'w' && false)) e.preventDefault();
+      // keep gameplay keys from scrolling the page while a round is running,
+      // but never steal them from a focused control (space activates buttons)
+      const onControl = e.target && e.target.closest && e.target.closest('button, input, select, textarea, a[href]');
+      if (this.round && !onControl &&
+          (k === ' ' || k === 'arrowup' || k === 'arrowdown' || k === 'arrowleft' || k === 'arrowright')) e.preventDefault();
       if (k === ' ' || k === 'enter') this.audio.start();
     });
     window.addEventListener('keyup', (e) => { this.keys[e.key.toLowerCase()] = false; });
@@ -205,6 +210,7 @@ export class App {
       timeLimit: opts.timeLimit,
     });
     this.resultsShown = false;
+    this.hostedRound = null;   // solo rounds never talk to the host
     this.scene.buildCourse(this.round.state.course, def.theme || 'cumulus');
     this.scene.ensurePlayers(this.round.state.players);
     this.audio.setMusicTheme(themeById(def.theme || 'cumulus').music);
@@ -226,11 +232,26 @@ export class App {
   endRoundTo(screenFn) {
     this.round = null;
     this.show = null;
+    this.clearRoundChrome();
+    screenFn();
+  }
+
+  // Hide every in-round overlay. Menus call this too, because results-screen
+  // follow-ups (e.g. "Back to title", "Challenges") jump straight to a menu
+  // and would otherwise leave the HUD and touch controls on top of it.
+  clearRoundChrome() {
+    this.hostedRound = null;
     el('hud').classList.add('hidden');
     el('countdown').classList.add('hidden');
     el('lesson-banner').classList.add('hidden');
     el('touch-ui').classList.add('hidden');
-    screenFn();
+  }
+
+  // Leaving a round for a menu screen: drop the session and its chrome.
+  leaveRound() {
+    if (this.round) this.round = null;
+    this.show = null;
+    this.clearRoundChrome();
   }
 
   togglePause() {
@@ -305,6 +326,15 @@ export class App {
       const mv = this.readMoveInput();
       const ac = this.readActionInput();
       this.round.setInput({ ...mv, ...ac, forwardHeld: mv.mz > 0.5 });
+      // hosted rounds: the server owns the sim, so the same input also goes
+      // upstream. Commands must target a future tick (the current one is
+      // already committed), and buttons are edge-triggered like locally.
+      if (this.hostedRound && this.hosted && this.hosted.connected) {
+        const prev = this.hostedRound.prev || { jump: false, dive: false };
+        this.hosted.sendInput(this.round.state.tick + 3, mv.mx, mv.mz,
+          ac.jump && !prev.jump, ac.dive && !prev.dive);
+        this.hostedRound.prev = { jump: ac.jump, dive: ac.dive };
+      }
     }
   }
 
@@ -335,8 +365,8 @@ export class App {
     }
     if (me.qualified) {
       save.stats.qualifies++;
-      save.stats.bestStreak = save.stats.bestStreak || 0;
       this.streak = (this.streak || 0) + 1;
+      save.stats.bestStreak = Math.max(save.stats.bestStreak || 0, this.streak);
       if (this.streak >= 3) unlock('streak_3');
     } else this.streak = 0;
 
@@ -605,9 +635,10 @@ export class App {
     this.attractState = { t: 0 };
   }
 
-  endlessCleanup() { this.round = null; this.show = null; this.attractState = null; }
+  endlessCleanup() { this.leaveRound(); this.attractState = null; }
 
   showModes() {
+    this.leaveRound();
     const hostedOk = this.hosted && this.hosted.available;
     this.overlay(`
       <div class="panel" role="dialog" aria-labelledby="modes-h">
@@ -634,6 +665,7 @@ export class App {
   }
 
   showLearn() {
+    this.leaveRound();
     const done = this.store.save.lessonsDone;
     const cards = LESSONS.map((l, i) => `
       <button class="card ${done[l.id] ? 'done' : ''}" data-lesson="${i}">
@@ -653,6 +685,7 @@ export class App {
   }
 
   showJourney() {
+    this.leaveRound();
     const save = this.store.save;
     const cards = JOURNEY.map((st) => {
       const id = 'j' + String(st.stage).padStart(2, '0');
@@ -677,6 +710,7 @@ export class App {
   }
 
   showPractice() {
+    this.leaveRound();
     const options = [...JOURNEY.map(s => ({ id: s.id, name: `${s.stage}. ${s.name}` })), ...ARENAS.map(a => ({ id: a.id, name: a.name + ' (survival)' }))]
       .map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
     this.overlay(`
@@ -702,6 +736,7 @@ export class App {
   }
 
   showChallenges() {
+    this.leaveRound();
     const done = this.store.save.challengesDone;
     const cards = CHALLENGES.map(c => `
       <button class="card ${done[c.id] ? 'done' : ''}" data-chal="${c.id}">
@@ -720,6 +755,7 @@ export class App {
   }
 
   showShowSetup() {
+    this.leaveRound();
     const cards = SHOWS.map(s => `
       <button class="card" data-show="${s.id}">
         <span class="card-title">${esc(s.name)}</span>
@@ -738,6 +774,7 @@ export class App {
   }
 
   showHosted() {
+    this.leaveRound();
     this.overlay(`
       <div class="panel" role="dialog" aria-labelledby="host-h">
         <h1 id="host-h">Hosted play</h1>
@@ -812,7 +849,15 @@ export class App {
     this.journeyCtx = null; this.challengeCtx = null; this.dailyCtx = null; this.showCtx = null;
     const roster = msg.roster.map(r => ({ ...r, isBot: r.isBot }));
     this.round = new LocalRound(def, roster, { quota: msg.quota, botSkill: 0.6 });
-    this.hostedRound = { serverTick: 0 };
+    // follow *our* seat, not merely the first non-bot in the roster
+    if (this.hosted.playerId && roster.some(r => r.id === this.hosted.playerId)) {
+      this.round.localId = this.hosted.playerId;
+    }
+    // the server starts stepping immediately: skip the local countdown so
+    // input is accepted from the first frame
+    this.round.phase = 'active';
+    this.round.cdLeft = 0;
+    this.hostedRound = { serverTick: 0, prev: { jump: false, dive: false } };
     this.resultsShown = false;
     this.scene.buildCourse(this.round.state.course, def.theme || 'cumulus');
     el('screens').innerHTML = '';
