@@ -213,7 +213,9 @@ export class App {
     this.hostedRound = null;   // solo rounds never talk to the host
     this.scene.buildCourse(this.round.state.course, def.theme || 'cumulus');
     this.scene.ensurePlayers(this.round.state.players);
-    this.audio.setMusicTheme(themeById(def.theme || 'cumulus').music);
+    const theme = themeById(def.theme || 'cumulus');
+    this.audio.setMusicTheme(theme.music);
+    this.audio.setAmbienceTone(theme.ambHz || 500);
     el('screens').innerHTML = '';
     el('hud').classList.remove('hidden');
     el('countdown').classList.remove('hidden');
@@ -632,6 +634,7 @@ export class App {
     const def = courseById('show-ridge');
     if (!def) return;
     this.scene.buildAttractCourse(def);
+    this.audio.setAmbienceTone(themeById(def.theme || 'cumulus').ambHz || 500);
     this.attractState = { t: 0 };
   }
 
@@ -860,6 +863,9 @@ export class App {
     this.hostedRound = { serverTick: 0, prev: { jump: false, dive: false } };
     this.resultsShown = false;
     this.scene.buildCourse(this.round.state.course, def.theme || 'cumulus');
+    const theme = themeById(def.theme || 'cumulus');
+    this.audio.setMusicTheme(theme.music);
+    this.audio.setAmbienceTone(theme.ambHz || 500);
     el('screens').innerHTML = '';
     el('hud').classList.remove('hidden');
     if ('ontouchstart' in window) el('touch-ui').classList.remove('hidden');

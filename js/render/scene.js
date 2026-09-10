@@ -336,11 +336,15 @@ export class GameScene {
     const rng = new Rng(course.seed, 'decor');
     const grp = new THREE.Group();
     this.decorGroup = grp;
+    const kinds = theme.decor || ['cloud', 'island'];
     const count = Math.round(26 * this.quality.decor);
     // floating islands + clouds, deterministic
     const islandGeo = new THREE.DodecahedronGeometry(1, 0);
     const islandMat = new THREE.MeshStandardMaterial({ color: theme.platform.under, roughness: 1 });
-    const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, transparent: true, opacity: 0.85 });
+    const cloudMat = new THREE.MeshStandardMaterial({
+      color: kinds.includes('storm') ? 0x8d99ae : 0xffffff,
+      roughness: 1, transparent: true, opacity: kinds.includes('storm') ? 0.95 : 0.85,
+    });
     const cloudGeo = new THREE.SphereGeometry(1, 10, 8);
     const islands = new THREE.InstancedMesh(islandGeo, islandMat, count);
     const clouds = new THREE.InstancedMesh(cloudGeo, cloudMat, count * 3);
@@ -365,6 +369,68 @@ export class GameScene {
     islands.instanceMatrix.needsUpdate = true;
     clouds.instanceMatrix.needsUpdate = true;
     grp.add(islands); grp.add(clouds);
+
+    // theme decor kinds beyond the base islands + clouds
+    if (kinds.includes('star')) {
+      // distant pinprick stars (night themes)
+      const n = Math.round(240 * this.quality.decor);
+      const pos = new Float32Array(n * 3);
+      for (let i = 0; i < n; i++) {
+        const ang = rng.range(0, TAU), rad = rng.range(150, 300);
+        pos[i * 3] = Math.cos(ang) * rad;
+        pos[i * 3 + 1] = rng.range(30, 170);
+        pos[i * 3 + 2] = Math.sin(ang) * rad;
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      grp.add(new THREE.Points(geo, new THREE.PointsMaterial({
+        color: 0xffffff, size: 1.6, sizeAttenuation: false, fog: false, transparent: true, opacity: 0.9,
+      })));
+    }
+    if (kinds.includes('balloon')) {
+      const n = Math.max(2, Math.round(6 * this.quality.decor));
+      const mesh = new THREE.InstancedMesh(
+        new THREE.SphereGeometry(1, 12, 10),
+        new THREE.MeshStandardMaterial({ color: theme.accent, roughness: 0.5, emissive: theme.accent, emissiveIntensity: 0.15 }), n);
+      for (let i = 0; i < n; i++) {
+        const ang = rng.range(0, TAU), rad = rng.range(28, 90);
+        const sc = rng.range(1.1, 2.1);
+        mtx.makeScale(sc, sc * 1.3, sc);
+        mtx.setPosition(Math.cos(ang) * rad, rng.range(10, 28), rng.range(-20, (course.length || 60) + 40));
+        mesh.setMatrixAt(i, mtx);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      grp.add(mesh);
+    }
+    if (kinds.includes('kite')) {
+      const n = Math.max(2, Math.round(5 * this.quality.decor));
+      const mesh = new THREE.InstancedMesh(
+        new THREE.ConeGeometry(1, 0.5, 4),
+        new THREE.MeshStandardMaterial({ color: theme.hazard, roughness: 0.6, emissive: theme.hazard, emissiveIntensity: 0.2 }), n);
+      const rot = new THREE.Matrix4();
+      for (let i = 0; i < n; i++) {
+        const ang = rng.range(0, TAU), rad = rng.range(24, 80);
+        rot.makeRotationFromEuler(new THREE.Euler(rng.range(-0.5, 0.5), rng.range(0, TAU), Math.PI));
+        rot.scale(new THREE.Vector3(1.4, 1.4, 0.25));
+        rot.setPosition(Math.cos(ang) * rad, rng.range(12, 30), rng.range(-16, (course.length || 60) + 36));
+        mesh.setMatrixAt(i, rot);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      grp.add(mesh);
+    }
+    if (kinds.includes('aurora')) {
+      // slow additive sky ribbons (aurora themes)
+      const mat = new THREE.MeshBasicMaterial({
+        color: theme.checkpoint, transparent: true, opacity: 0.14,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false,
+      });
+      for (let i = 0; i < 3; i++) {
+        const ribbon = new THREE.Mesh(new THREE.PlaneGeometry(rng.range(30, 60), rng.range(40, 70)), mat);
+        ribbon.position.set(rng.range(-130, 130), rng.range(42, 72), rng.range(60, 170));
+        ribbon.rotation.y = rng.range(0, TAU);
+        grp.add(ribbon);
+      }
+    }
     this.scene.add(grp);
   }
 

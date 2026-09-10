@@ -13,7 +13,7 @@ export const THEMES = {
     obstacle: { bar: 0xef476f, pole: 0x8338ec, bob: 0xff9f1c, block: 0x3a86ff, bumper: 0x06d6a0 },
     decor: ['cloud', 'balloon', 'island'],
     music: { root: 261.63, scale: [0, 2, 4, 7, 9], bpm: 112, bright: 1.0, pad: 'warm' },
-    ambience: 'breeze',
+    ambience: 'breeze', ambHz: 520,
   },
   dawn: {
     id: 'dawn', name: 'Dawn Drift',
@@ -26,7 +26,7 @@ export const THEMES = {
     obstacle: { bar: 0xe84a5f, pole: 0x583563, bob: 0xff9f1c, block: 0x2ec4b6, bumper: 0xffb27d },
     decor: ['cloud', 'island', 'kite'],
     music: { root: 220.0, scale: [0, 2, 3, 7, 8], bpm: 96, bright: 0.8, pad: 'dusk' },
-    ambience: 'warm-wind',
+    ambience: 'warm-wind', ambHz: 420,
   },
   nimbus: {
     id: 'nimbus', name: 'Nimbus Night',
@@ -39,7 +39,7 @@ export const THEMES = {
     obstacle: { bar: 0xff5d8f, pole: 0x4ce0b3, bob: 0xf9c74f, block: 0x8fb8ff, bumper: 0x4ce0b3 },
     decor: ['cloud', 'star', 'island'],
     music: { root: 196.0, scale: [0, 3, 5, 7, 10], bpm: 88, bright: 0.6, pad: 'night' },
-    ambience: 'night-air',
+    ambience: 'night-air', ambHz: 300,
   },
   storm: {
     id: 'storm', name: 'Storm Surge',
@@ -52,7 +52,7 @@ export const THEMES = {
     obstacle: { bar: 0xff6b5e, pole: 0x2a9d8f, bob: 0xf9c74f, block: 0x58e0c0, bumper: 0xf9c74f },
     decor: ['cloud', 'storm', 'island'],
     music: { root: 233.08, scale: [0, 2, 3, 7, 10], bpm: 124, bright: 0.9, pad: 'storm' },
-    ambience: 'storm-wind',
+    ambience: 'storm-wind', ambHz: 780,
   },
   aurora: {
     id: 'aurora', name: 'Aurora Heights',
@@ -65,7 +65,7 @@ export const THEMES = {
     obstacle: { bar: 0xff5d8f, pole: 0x3ddc97, bob: 0xffd166, block: 0xb892ff, bumper: 0x3ddc97 },
     decor: ['cloud', 'aurora', 'island', 'star'],
     music: { root: 246.94, scale: [0, 2, 4, 6, 7, 11], bpm: 104, bright: 1.1, pad: 'aurora' },
-    ambience: 'high-air',
+    ambience: 'high-air', ambHz: 620,
   },
 };
 
