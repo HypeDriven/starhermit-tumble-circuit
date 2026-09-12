@@ -125,14 +125,26 @@ export class App {
     el('btn-pause').addEventListener('click', () => this.togglePause());
 
     // touch joystick + action buttons
+    // the lesson banner sits below the HUD, whose height depends on wrapping
+    {
+      const hud = el('hud');
+      const sync = () => document.documentElement.style.setProperty('--hud-h', (hud.classList.contains('hidden') ? 0 : hud.offsetHeight) + 'px');
+      if (typeof ResizeObserver === 'function') new ResizeObserver(sync).observe(hud);
+      new MutationObserver(sync).observe(hud, { attributes: true, attributeFilter: ['class'] });
+      window.addEventListener('resize', sync);
+      sync();
+    }
     const zone = el('stick-zone'), base = el('stick-base'), nub = el('stick-nub');
     let stickId = null, origin = null;
+    const hint = el('stick-hint');
     zone.addEventListener('pointerdown', (e) => {
       stickId = e.pointerId; origin = { x: e.clientX, y: e.clientY };
       zone.setPointerCapture(e.pointerId);
-      base.style.display = 'block';
+      base.classList.add('active');
+      base.style.bottom = 'auto';
       base.style.left = (e.clientX - 55 - zone.getBoundingClientRect().left) + 'px';
       base.style.top = (e.clientY - 55 - zone.getBoundingClientRect().top) + 'px';
+      if (hint) hint.classList.add('hidden'); // first drag: the cue has done its job
       this.audio.start();
     });
     zone.addEventListener('pointermove', (e) => {
@@ -149,7 +161,9 @@ export class App {
       if (e.pointerId !== stickId) return;
       stickId = null; origin = null;
       this.touch.mx = 0; this.touch.mz = 0;
-      base.style.display = 'none';
+      // return to the resting spot so the stick is always discoverable
+      base.classList.remove('active');
+      base.style.left = ''; base.style.top = ''; base.style.bottom = '';
       nub.style.left = '31px'; nub.style.top = '31px';
     };
     zone.addEventListener('pointerup', endStick);
@@ -472,7 +486,8 @@ export class App {
     this.startRound(lesson, {
       lesson, bots: lesson.bots ? lesson.bots.count : 0, botSkill: lesson.bots ? lesson.bots.skill : 0.2,
       quota: lesson.passPlace || 1,
-      goalText: lesson.intro,
+      // the banner carries the instruction; the HUD keeps a short goal line
+      goalText: `Lesson: ${lesson.title} — reach the finish gate`,
     });
   }
 
@@ -620,7 +635,7 @@ export class App {
             <button data-act="help">Help</button>
           </div>
         </div>
-        <p class="small muted mt">WASD/arrows move · Space jump · Shift dive · Esc pause</p>
+        <p class="small muted mt">${'ontouchstart' in window ? 'Drag the stick (bottom-left) to move · Jump and Dive buttons (bottom-right)' : 'WASD/arrows move · Space jump · Shift dive · Esc pause'}</p>
       </div>`);
     this.onAction('play', () => this.showModes());
     this.onAction('daily', () => this.startDaily());

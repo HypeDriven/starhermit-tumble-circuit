@@ -91,7 +91,7 @@ The Three.js canvas fills the game region but is never the only UI. Menus, text,
 ### Input
 
 - Pointer/touch: raycast only against explicit interaction layers; use pointer capture for drags; cancel safely on lost capture.
-- Touch: distinguish tap, drag, and camera gesture by distance/time thresholds; never require multi-touch for core play.
+- Touch: distinguish tap, drag, and camera gesture by distance/time thresholds; never require multi-touch for core play. The movement stick rests visibly at the bottom-left with a "Drag here to move" cue until the first drag, then follows the finger and returns home on release; the title shows touch instructions on touch devices. The lesson banner sits below the measured HUD and carries the instruction once (the HUD shows a short goal line).
 - Keyboard: directional navigation among legal targets, confirm, cancel, pause, undo/hint where valid, and camera reset.
 - Gamepad: focus navigation, primary/secondary actions, pause, and remappable axes/buttons.
 - Prevent accidental double commits with action identifiers, not arbitrary long debounce timers. Provide visible drag origin, target preview, and invalid-action explanation.

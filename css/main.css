@@ -74,7 +74,8 @@ button:disabled { opacity: 0.45; cursor: default; }
 #btn-pause { background: var(--panel); }
 
 #lesson-banner {
-  position: absolute; top: calc(76px + var(--sat)); left: 50%; transform: translateX(-50%);
+  /* below the (possibly wrapped) HUD: --hud-h is measured in app.js */
+  position: absolute; top: calc(var(--hud-h, 68px) + 12px + var(--sat)); left: 50%; transform: translateX(-50%);
   background: var(--panel); border-left: 4px solid var(--accent); border-radius: 10px;
   padding: 10px 18px; font-size: 1.05em; max-width: min(90vw, 60ch); z-index: 6;
 }
@@ -100,8 +101,17 @@ button:disabled { opacity: 0.45; cursor: default; }
 #stick-base {
   position: absolute; width: 110px; height: 110px; border-radius: 50%;
   border: 2px solid rgba(255,255,255,0.4); background: rgba(255,255,255,0.08);
-  display: none;
+  /* resting stick: visible at its home spot until a drag relocates it */
+  left: calc(28px + var(--sal)); bottom: calc(28px + var(--sab));
+  opacity: 0.55; transition: opacity 0.15s;
 }
+#stick-base.active { opacity: 1; }
+#stick-hint {
+  position: absolute; left: calc(20px + var(--sal)); bottom: calc(150px + var(--sab));
+  font-size: 0.85em; color: var(--text-dim); background: rgba(0,0,0,0.55);
+  border-radius: 8px; padding: 4px 10px; pointer-events: none; white-space: nowrap;
+}
+#stick-hint.hidden { display: none; }
 #stick-nub {
   position: absolute; width: 48px; height: 48px; border-radius: 50%;
   background: rgba(255,255,255,0.55); left: 31px; top: 31px;
