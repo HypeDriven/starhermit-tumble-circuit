@@ -26,11 +26,12 @@ export const ACHIEVEMENTS = {
 };
 
 export class App {
-  constructor({ scene, audio, store, save, hosted }) {
+  constructor({ scene, audio, store, save, hosted, platform }) {
     this.scene = scene;
     this.audio = audio;
     this.store = store;   // { save, persist() }
     this.hosted = hosted;
+    this.platform = platform; // StarHermit adapter; offline no-ops without a token
     this.screen = 'title';
     this.round = null;
     this.show = null;
@@ -54,6 +55,7 @@ export class App {
   start() {
     this.bindInput();
     this.applySettings();
+    if (this.platform) this.platform.onStatus = () => this.renderAccountLine();
     this.showTitle();
     this.prevTime = performance.now();
     requestAnimationFrame(this.frame);
@@ -605,6 +607,7 @@ export class App {
       <div class="panel transparent-panel center" role="dialog" aria-labelledby="title-h">
         <h1 class="title-logo" id="title-h">Tumble <em>Circuit</em></h1>
         <p class="title-sub">Race the sky. Survive the spin. Take the crown.</p>
+        <p class="small muted" id="account-line" role="status"></p>
         <div class="col mt">
           <button class="primary" data-act="play">Play</button>
           <div class="row" style="justify-content:center">
@@ -625,6 +628,7 @@ export class App {
     this.onAction('learn', () => this.showLearn());
     this.onAction('settings', () => this.showSettings(() => this.showTitle()));
     this.onAction('help', () => this.showHelp(() => this.showTitle()));
+    this.renderAccountLine();
     if (!this.attractState) this.buildAttract();
   }
 
@@ -642,7 +646,15 @@ export class App {
 
   showModes() {
     this.leaveRound();
-    const hostedOk = this.hosted && this.hosted.available;
+    // The custom-protocol /ws rooms belong to this game's own dev server
+    // (server.js). They have no StarHermit platform endpoint, so on-platform
+    // the card is honestly disabled rather than promising rooms that cannot
+    // connect.
+    const platformHosted = !!(this.platform && this.platform.active);
+    const hostedOk = this.hosted && this.hosted.available && !platformHosted;
+    const hostedSub = hostedOk ? 'private rooms &amp; quick join (dev server)'
+      : platformHosted ? 'not available on this platform — local modes are fully playable'
+      : 'needs the hosted server';
     this.overlay(`
       <div class="panel" role="dialog" aria-labelledby="modes-h">
         <h1 id="modes-h">Choose a mode</h1>
@@ -653,7 +665,7 @@ export class App {
           <button class="card" data-act="practice"><span class="card-title">Practice</span><span class="card-sub">any course, your difficulty · unranked</span></button>
           <button class="card" data-act="challenges"><span class="card-title">Challenges</span><span class="card-sub">restricted tools &amp; speed goals</span></button>
           <button class="card" data-act="show"><span class="card-title">Show</span><span class="card-sub">elimination rounds to a final · 12–16 racers</span></button>
-          <button class="card" data-act="hosted" ${hostedOk ? '' : 'disabled'}><span class="card-title">Hosted play</span><span class="card-sub">${hostedOk ? 'private rooms &amp; quick join' : 'needs the hosted server'}</span></button>
+          <button class="card" data-act="hosted" ${hostedOk ? '' : 'disabled'}><span class="card-title">Hosted play</span><span class="card-sub">${hostedSub}</span></button>
         </div>
         <div class="row mt"><button data-act="back">Back</button></div>
       </div>`);
@@ -1028,7 +1040,21 @@ export class App {
     this.captionTimer = setTimeout(() => c.classList.add('hidden'), 1400);
   }
 
-  profileName() { return 'You'; }
+  profileName() { return (this.platform && this.platform.nickname) || 'You'; }
+
+  // Small account/sync line under the title logo: account nickname plus the
+  // cloud-save state when hosted; guest note otherwise. Re-rendered whenever
+  // the platform adapter reports a sync-status change.
+  renderAccountLine() {
+    const line = el('account-line');
+    if (!line || !this.platform) return;
+    if (!this.platform.active) {
+      line.textContent = 'Guest practice — progress stays on this device';
+      return;
+    }
+    const label = { synced: 'progress synced', saving: 'saving…', error: 'sync pending — will retry', offline: 'offline — local save' }[this.platform.status] || this.platform.status;
+    line.textContent = `Playing as ${this.profileName()} · ${label}`;
+  }
 
   persistStats() { this.store.persist(); }
 }

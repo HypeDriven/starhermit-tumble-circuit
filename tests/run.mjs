@@ -400,6 +400,23 @@ section('save migration + checksum + conflict resolution');
   ok(resolveCloudConflict(a, b).startsWith('conflict'), 'diverged saves conflict');
 }
 
+section('platform cloud-save codec (stored zip)');
+{
+  const { zipStore, unzipFirstEntry, bytesToBase64, base64ToBytes, decodeJwtPayload } = await import('../js/platform/platform.js');
+  const doc = { version: 1, journey: { unlocked: 3, passed: { j01: 120 }, crowns: {} }, stats: { races: 7 } };
+  const bytes = new TextEncoder().encode(JSON.stringify(doc));
+  const zip = zipStore('save.json', bytes);
+  ok(zip[0] === 0x50 && zip[1] === 0x4b, 'cloud payload starts with local-file magic');
+  const back = JSON.parse(new TextDecoder().decode(unzipFirstEntry(zip)));
+  ok(JSON.stringify(back) === JSON.stringify(doc), 'stored zip round-trips the save doc');
+  const b64 = bytesToBase64(zip);
+  ok(Array.from(base64ToBytes(b64)).join(',') === Array.from(zip).join(','), 'base64 helpers round-trip');
+  const tok = 'eyJhbGciOiJub25lIn0.' + bytesToBase64(new TextEncoder().encode(JSON.stringify({ sub: 'u1234567890', game_scope: 'tumble-circuit' }))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') + '.sig';
+  const claims = decodeJwtPayload(tok);
+  ok(claims && claims.sub === 'u1234567890' && claims.game_scope === 'tumble-circuit', 'launch token payload decodes sub + game_scope');
+  ok(decodeJwtPayload('not-a-jwt') === null, 'malformed token payload rejected');
+}
+
 section('content validation sweep');
 {
   const dates = [];

@@ -44,7 +44,7 @@ Authoritative checkpoints determine qualification; finals use finish order or su
 - **Daily:** one shared seed and ruleset per UTC day, synchronized to platform time.
 - **Practice:** selectable difficulty, restart, undo where rules permit, and no effect on competitive rating.
 - **Challenge:** constrained goals such as move limits, speed targets, altered layouts, or restricted tools.
-- **Hosted play:** private invitations and appropriate public matching, with reconnect and authoritative results.
+- **Hosted play:** private invitations and appropriate public matching, with reconnect and authoritative results. (Ships against the local dev server only; the on-platform entry point is honestly disabled until realtime-rooms migration.)
 
 ### Difficulty and content generation
 
@@ -186,13 +186,13 @@ No module may mutate rules state except through a validated command. Rendering c
 
 ### Packaging and launch
 - Ship a browser distribution with `starhermit.txt` at its root, `name=Tumble Circuit`, and `launch=index.html`. Keep source files, secrets, design documents, and source maps outside the uploaded distribution.
-- Read the game scope from the short-lived launch token rather than hard-coding a slug. Use same-origin `/api` and `/ws` routes when hosted. Refresh account tokens through the host shell; never persist access or launch tokens in local storage.
+- Read the game scope from the short-lived launch token (`#game_token=` fragment, stripped on read; query fallbacks for local dev) rather than hard-coding a slug. Send it as `Authorization: Bearer` on every REST call and refresh it every 45 min via `POST /api/v1/games/{slug}/launch-token`; never persist access or launch tokens in local storage. The custom `/ws` rooms protocol is served only by the local dev server, not the platform.
 - Synchronize countdowns and daily boundaries with `GET /api/v1/time` using round-trip-adjusted offset. Treat rate limits and structured `{"error":"..."}` responses as recoverable UI states.
 
 ### Identity, profile, presence, and preferences
-- Support guest practice locally, then offer account sign-in for durable progress. Use the profile display name and avatar only where identity is useful, honor profile privacy, and send throttled presence heartbeats while actively playing.
+- Support guest practice locally, then offer account sign-in for durable progress. Use the profile display name and avatar only where identity is useful, honor profile privacy. The account nickname comes from `GET /api/v1/users/{id}/profile`; the client sends no presence heartbeats (the platform has no per-game presence endpoint).
 - Store accessibility, audio, graphics tier, tutorial completion, camera preference, and rules options through per-game settings. Declare desktop action bindings and read player overrides; touch mappings remain responsive UI controls.
-- Cloud-save progression as a versioned, checksummed document. Resolve conflicts by preserving both snapshots and asking the player when neither is a strict descendant. Never place credentials or private chat in saves.
+- Cloud-save progression as a versioned, checksummed document to the single `/api/v1/me/cloud-saves/{slug}` slot (zip+base64), debounced with a pagehide flush; localStorage stays the offline cache and the remote copy wins conflicts. Never place credentials or private chat in saves.
 
 ### Discovery, activity, and social layer
 - Start and end launch activity so playtime is accurate. Surface entitlement or catalog state only in host-owned chrome; the game itself must remain playable without promotional interruption.

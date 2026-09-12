@@ -1,7 +1,10 @@
-// Hosted-play client: JSON control frames over WebSocket for lifecycle and
-// compact binary frames for high-frequency input/snapshots. All gameplay
-// truth comes from the server; this client sends validated commands with
-// unique IDs and renders snapshots. Reconnects with a fresh snapshot.
+// Local-dev hosted-play client: JSON control frames over WebSocket for
+// lifecycle and compact binary frames for high-frequency input/snapshots.
+// This custom protocol is served only by this game's own dev server
+// (server.js); the StarHermit platform has no endpoint for it, so the client
+// never opens this socket when launched on-platform (see ui/app.js). All
+// gameplay truth comes from the server; this client sends validated commands
+// with unique IDs and renders snapshots. Reconnects with a fresh snapshot.
 
 const FRAME_CMD = 1;     // client -> server binary input frame
 const FRAME_SNAP = 2;    // server -> client binary snapshot (reserved; JSON used for state)

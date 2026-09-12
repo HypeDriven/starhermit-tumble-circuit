@@ -85,7 +85,9 @@ export function persistSave(doc) {
 
 // Conflict resolution helper: given two documents, returns 'local' when the
 // local doc strictly descends from remote (superset of progression), 'remote'
-// likewise, or 'conflict' when neither does (caller must ask the player).
+// likewise, or a 'conflict-*' verdict when neither does. The cloud loader
+// (js/main.js) mirrors a 'local' win upward and otherwise keeps the remote
+// copy, per the platform's remote-preferred conflict policy.
 export function resolveCloudConflict(local, remote) {
   const score = (d) => Object.keys(d.journey.passed || {}).length +
     Object.keys(d.lessonsDone || {}).length + Object.keys(d.challengesDone || {}).length +
