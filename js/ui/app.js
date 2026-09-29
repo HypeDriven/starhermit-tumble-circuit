@@ -10,6 +10,8 @@ import { createShow, currentRound, applyRoundResult, showTable, isFinalRound } f
 import { formatTicks } from '../rules/scoring.js';
 import { TICK_RATE, rankPlayers, PSTATE } from '../rules/sim.js';
 import { utcDateString, msUntilNextUtcDay } from '../platform/timeSync.js';
+import { PRESETS, CATEGORIES, presetTier, choosePreset } from '../render/gfx.js';
+import { gfxStrings } from './gfxStrings.js';
 
 const $ = (sel) => document.querySelector(sel);
 const el = (id) => document.getElementById(id);
@@ -943,9 +945,7 @@ export class App {
         ${this.slider('set-ambience', 'Ambience', s.ambience)}
         ${this.check('set-captions', 'Captions for sound cues', s.captions)}
         <h2>Graphics</h2>
-        <label class="field"><span>Quality tier</span><select id="set-quality">
-          ${['auto', 'high', 'medium', 'low'].map(q => `<option ${s.quality === q ? 'selected' : ''}>${q}</option>`).join('')}
-        </select></label>
+        <div id="gfx-section" class="gfx-section"></div>
         ${this.check('set-shake', 'Camera shake', s.cameraShake)}
         <label class="field"><span>Camera</span><select id="set-camera">
           <option value="follow" ${s.camera === 'follow' ? 'selected' : ''}>follow</option>
@@ -969,7 +969,6 @@ export class App {
     bind('set-effects', t => s.effects = +t.value);
     bind('set-ambience', t => s.ambience = +t.value);
     bind('set-captions', t => s.captions = t.checked);
-    bind('set-quality', t => s.quality = t.value);
     bind('set-shake', t => s.cameraShake = t.checked);
     bind('set-camera', t => s.camera = t.value);
     bind('set-rm', t => s.reducedMotion = t.checked);
@@ -977,8 +976,71 @@ export class App {
     bind('set-palette', t => s.palette = t.value);
     bind('set-text', t => s.textScale = +t.value);
     bind('set-lefty', t => s.leftHanded = t.checked);
-    this.onAction('done', () => back());
-    this.onAction('replay-tutorial', () => this.startLesson(0));
+    this.onAction('done', () => { clearInterval(this.gfxTimer); back(); });
+    this.onAction('replay-tutorial', () => { clearInterval(this.gfxTimer); this.startLesson(0); });
+    this.renderGraphicsSection();
+  }
+
+  // Graphics section: preset, render scale, per-effect overrides, adaptive
+  // resolution, frame-rate readout and a GPU / cost summary. Changes apply
+  // live and persist in settings.gfx.
+  renderGraphicsSection(focusId) {
+    const box = el('gfx-section');
+    if (!box) return;
+    const T = gfxStrings(navigator.language);
+    const s = this.settings;
+    const saved = s.gfx || {};
+    const info = this.scene.graphicsInfo();
+    const r = info.resolved;
+    const tier = (t) => T.tiers[t] || t;
+    const preset = PRESETS.includes(saved.preset) ? saved.preset : 'auto';
+    const opt = (v, label, sel) => `<option value="${v}" ${sel ? 'selected' : ''}>${esc(label)}</option>`;
+    const pct = Math.round((Number(saved.render_scale) || 1) * 100);
+    box.innerHTML = `
+      <label class="field"><span>${esc(T.quality)}</span><select id="gfx-preset" data-gfx="preset">
+        ${opt('auto', T.auto.replace('{tier}', tier(info.detected)), preset === 'auto')}
+        ${PRESETS.map(p => opt(p, tier(p), preset === p)).join('')}
+      </select></label>
+      <label class="field gfx-scale-row"><span>${esc(T.scale)} <output id="gfx-scale-val" for="gfx-scale">${pct}%</output></span>
+        <input type="range" id="gfx-scale" data-gfx="render_scale" min="50" max="200" step="5" value="${pct}" aria-label="${esc(T.scale)}"></label>
+      ${Object.entries(CATEGORIES).map(([cat, tiers]) => `
+      <label class="field"><span>${esc(T.cats[cat])}</span><select id="gfx-${cat}" data-gfx-cat="${cat}">
+        ${opt('preset', T.fromPreset.replace('{tier}', tier(presetTier(r.preset, cat))), !tiers.includes(saved[cat]))}
+        ${tiers.map(t => opt(t, tier(t), saved[cat] === t)).join('')}
+      </select></label>`).join('')}
+      <label class="field"><span>${esc(T.adaptive)}</span><input type="checkbox" id="gfx-adaptive" ${r.adaptive ? 'checked' : ''} aria-label="${esc(T.adaptive)}"></label>
+      <label class="field"><span>${esc(T.showFps)}</span><input type="checkbox" id="gfx-fps" ${r.showFps ? 'checked' : ''} aria-label="${esc(T.showFps)}"></label>
+      <p class="small muted gfx-summary" id="gfx-summary" role="status"></p>
+      <p class="small gfx-note ${info.postFailed ? '' : 'hidden'}" id="gfx-note">${esc(T.postFailed)}</p>`;
+    const commit = (next, id) => {
+      s.gfx = next;
+      this.store.persist();
+      this.scene.setGraphics(next);
+      this.audio.event({ t: 'ui' });
+      this.renderGraphicsSection(id);
+    };
+    el('gfx-preset').addEventListener('change', (e) => commit(choosePreset(saved, e.target.value), 'gfx-preset'));
+    const scale = el('gfx-scale');
+    scale.addEventListener('input', () => { el('gfx-scale-val').textContent = scale.value + '%'; });
+    scale.addEventListener('change', () => commit({ ...saved, render_scale: +scale.value / 100 }, 'gfx-scale'));
+    box.querySelectorAll('[data-gfx-cat]').forEach(sel => sel.addEventListener('change', () => {
+      const next = { ...saved };
+      if (sel.value === 'preset') delete next[sel.dataset.gfxCat]; else next[sel.dataset.gfxCat] = sel.value;
+      commit(next, sel.id);
+    }));
+    el('gfx-adaptive').addEventListener('change', (e) => commit({ ...saved, adaptive: e.target.checked }, 'gfx-adaptive'));
+    el('gfx-fps').addEventListener('change', (e) => commit({ ...saved, show_fps: e.target.checked }, 'gfx-fps'));
+    if (focusId && el(focusId)) el(focusId).focus();
+    const summary = () => {
+      const i = this.scene.graphicsInfo();
+      const line = el('gfx-summary');
+      if (!line) { clearInterval(this.gfxTimer); return; }
+      line.textContent = `${i.gpu} · ${i.summary}`;
+      el('gfx-note')?.classList.toggle('hidden', !i.postFailed);
+    };
+    summary();
+    clearInterval(this.gfxTimer);
+    this.gfxTimer = setInterval(summary, 500);
   }
 
   slider(id, label, v) {
@@ -1025,19 +1087,12 @@ export class App {
     this.scene.reducedMotion = !!s.reducedMotion;
     this.scene.camShake = s.cameraShake !== false;
     this.scene.cameraMode = s.camera || 'follow';
-    const tier = s.quality === 'auto' ? this.autoQuality() : s.quality;
-    this.scene.setQuality(tier);
+    this.scene.setGraphics(s.gfx || {});
     if (this.scene.palette !== s.palette) {
       this.scene.palette = s.palette;
       // rebuild to apply palette colors
-      if (this.round) this.scene.buildCourse(this.round.state.course, this.round.def.theme || 'cumulus');
+      this.scene.rebuild();
     }
-  }
-
-  autoQuality() {
-    const mobile = /Android|iPhone|iPad/i.test(navigator.userAgent) || (navigator.hardwareConcurrency || 8) <= 4;
-    if (mobile) return this.fps < 45 ? 'low' : 'medium';
-    return this.fps < 45 ? 'medium' : 'high';
   }
 
   announceText(text, urgent = false) {

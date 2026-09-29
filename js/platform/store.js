@@ -16,7 +16,8 @@ const DEFAULTS = () => ({
   stats: { races: 0, finishes: 0, qualifies: 0, showsWon: 0, bestStreak: 0 },
   settings: {
     music: 0.7, effects: 0.9, ambience: 0.5, voice: 0.0,
-    quality: 'auto',         // auto | high | medium | low
+    quality: 'auto',         // legacy tier (superseded by gfx)
+    gfx: {},                 // graphics: { preset, render_scale, adaptive, show_fps, <category>: tier } — see js/render/gfx.js
     reducedMotion: false, highContrast: false, palette: 'standard', // standard | deuteranopia | protanopia | tritanopia
     textScale: 1, leftHanded: false, cameraShake: true, captions: true,
     camera: 'follow',        // follow | far

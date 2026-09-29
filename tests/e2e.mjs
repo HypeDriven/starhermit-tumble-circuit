@@ -108,6 +108,60 @@ async function startLesson1(page) {
   }, null, { timeout: 15000 });
 }
 
+// Open Settings from the title and return the Graphics section.
+async function openGraphics(page) {
+  await page.click('#screens [data-act="settings"]');
+  await page.waitForSelector('#gfx-section #gfx-preset');
+  await page.locator('#gfx-preset').scrollIntoViewIfNeeded();
+}
+
+const gfxState = (page) => page.evaluate(() => ({
+  preset: document.body.dataset.gfxPreset,
+  select: document.getElementById('gfx-preset')?.value,
+  bloom: document.getElementById('gfx-bloom')?.value,
+  summary: document.getElementById('gfx-summary')?.textContent || '',
+}));
+
+async function graphicsFlow(page, name) {
+  await openGraphics(page);
+  let st = await gfxState(page);
+  if (st.select !== 'auto' || st.preset !== 'low') throw new Error(`expected Auto→low on a software GPU, got ${JSON.stringify(st)}`);
+  // the section must fit inside the viewport width (no horizontal cut-off)
+  const fits = await page.evaluate(() => {
+    const vw = document.documentElement.clientWidth;
+    return [...document.querySelectorAll('#gfx-section select, #gfx-section input, #gfx-section output')]
+      .every(e => { const r = e.getBoundingClientRect(); return r.left >= 0 && r.right <= vw + 1; });
+  });
+  if (!fits) throw new Error('graphics controls overflow the viewport');
+  await page.selectOption('#gfx-preset', 'ultra');
+  await page.waitForFunction(() => document.body.dataset.gfxPreset === 'ultra');
+  await page.selectOption('#gfx-preset', 'low');
+  await page.waitForFunction(() => document.body.dataset.gfxPreset === 'low');
+  await page.selectOption('#gfx-preset', 'high');
+  await page.waitForFunction(() => document.body.dataset.gfxPreset === 'high');
+  st = await gfxState(page);
+  if (!/bloom/.test(st.summary) || !/2048² shadows/.test(st.summary)) throw new Error(`High summary unexpected: ${st.summary}`);
+  await page.selectOption('#gfx-bloom', 'off');
+  await page.waitForFunction(() => !/bloom/.test(document.getElementById('gfx-summary')?.textContent || 'bloom'));
+  await page.screenshot({ path: SHOT('graphics', name) });
+  ok(`${name}: Graphics presets (Ultra/Low/High) + bloom override apply live`);
+
+  await page.reload({ waitUntil: 'load' });
+  await page.waitForSelector('#screens [data-act="settings"]', { timeout: 30000 });
+  await openGraphics(page);
+  st = await gfxState(page);
+  if (st.preset !== 'high' || st.select !== 'high' || st.bloom !== 'off') throw new Error(`graphics settings did not persist: ${JSON.stringify(st)}`);
+  ok(`${name}: Graphics settings survive a reload`);
+
+  // choosing a preset clears overrides; Auto keeps the rest of the run fast
+  await page.selectOption('#gfx-preset', 'auto');
+  await page.waitForFunction(() => document.body.dataset.gfxPreset === 'low');
+  st = await gfxState(page);
+  if (st.bloom !== 'preset') throw new Error('choosing a preset did not clear the override');
+  await page.click('#screens [data-act="done"]');
+  await page.waitForSelector('#screens [data-act="play"]');
+}
+
 // ---------- one full pass ----------
 async function runPass(browser, name, ctxOpts, { full }) {
   const errors = [];
@@ -115,10 +169,10 @@ async function runPass(browser, name, ctxOpts, { full }) {
   const page = await context.newPage();
   page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
   page.on('console', (m) => {
-    if (m.type() !== 'error' || browserNoise.test(m.text())) return;
+    if ((m.type() !== 'error' && m.type() !== 'warning') || browserNoise.test(m.text())) return;
     const url = m.location()?.url || '';
     if (/Failed to load resource/.test(m.text()) && /\/api\/|\/favicon/.test(url)) return;
-    errors.push(`console: ${m.text()}`);
+    errors.push(`console ${m.type()}: ${m.text()}`);
   });
   page.on('response', (r) => {
     const u = r.url();
@@ -131,6 +185,10 @@ async function runPass(browser, name, ctxOpts, { full }) {
     await page.waitForSelector('#screens [data-act="play"]', { timeout: 15000 });
     await page.screenshot({ path: SHOT('title', name) });
     ok(`${name}: title screen visible (Play button present)`);
+
+    // Settings → Graphics through the visible UI: presets, one override,
+    // persistence across a reload, then back to Auto for the rest of the run.
+    await graphicsFlow(page, name);
 
     // start Learn → Lesson 1
     await startLesson1(page);

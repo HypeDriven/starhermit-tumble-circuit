@@ -185,6 +185,21 @@ input[type="range"] { width: 160px; accent-color: var(--accent); }
 input[type="checkbox"] { width: 22px; height: 22px; accent-color: var(--accent); }
 select { font: inherit; background: #1c2440; color: var(--text); border-radius: 8px; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.25); min-height: 44px; }
 
+/* ---------------- graphics settings ---------------- */
+.gfx-section select { max-width: 62%; min-width: 0; text-overflow: ellipsis; }
+.gfx-section label.field span { min-width: 0; }
+.gfx-section output { color: var(--accent); font-variant-numeric: tabular-nums; white-space: nowrap; margin-left: 6px; }
+.gfx-section input[type="range"] { flex: 0 1 160px; min-width: 70px; width: auto; }
+.gfx-section .gfx-scale-row span { white-space: nowrap; flex: 0 0 auto; }
+.gfx-summary { overflow-wrap: anywhere; margin: 8px 0 0; }
+.gfx-note { color: #ffb3c6; margin: 4px 0 0; }
+#fps-meter {
+  position: absolute; left: calc(6px + var(--sal)); bottom: calc(4px + var(--sab)); z-index: 9;
+  font: 600 12px/1.2 ui-monospace, monospace; color: #fff; background: rgba(0,0,0,0.5);
+  padding: 2px 6px; border-radius: 6px; pointer-events: none;
+}
+#fps-meter[hidden] { display: none; }
+
 /* ---------------- high contrast / palettes ---------------- */
 body.hc {
   --panel: rgba(0,0,0,0.94); --panel-solid: #000;
