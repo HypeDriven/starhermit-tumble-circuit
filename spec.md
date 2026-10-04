@@ -194,29 +194,29 @@ No module may mutate rules state except through a validated command. Rendering c
 
 ### Packaging and launch
 - Ship a browser distribution with `starhermit.txt` at its root, `name=Tumble Circuit`, and `launch=index.html`. Keep source files, secrets, design documents, and source maps outside the uploaded distribution.
-- Read the game scope from the short-lived launch token (`#game_token=` fragment, stripped on read; query fallbacks for local dev) rather than hard-coding a slug. Send it as `Authorization: Bearer` on every REST call and refresh it every 45 min via `POST /api/v1/games/{slug}/launch-token`; never persist access or launch tokens in local storage. The custom `/ws` rooms protocol is served only by the local dev server, not the platform.
-- Synchronize countdowns and daily boundaries with `GET /api/v1/time` using round-trip-adjusted offset. Treat rate limits and structured `{"error":"..."}` responses as recoverable UI states.
+- `index.html` loads the canonical `starhermit-sdk.js` (unmodified copy of `tools/starhermit-sdk.js`) and calls `StarHermit.init()` before any module runs. The SDK reads `#game_token=` / `#access_token=`, strips it from the URL, takes the slug from the `game_scope` claim and renews the launch token; tokens never reach local storage. `js/platform/platform.js` wraps the SDK.
+- Without a token the game makes no automatic network calls (no time sync, no saves); the only network use is the opt-in Hosted play card, which talks to this game's own dev server (`server.js` custom `/ws` rooms) and is disabled on-platform. When renewal is refused the game shows a "signed out" toast, re-offers sign-in and keeps playing locally.
+- Hosted, countdowns and daily boundaries use `GET /api/v1/time` with a round-trip-adjusted offset; failures fall back to the local clock.
 
 ### Identity, profile, presence, and preferences
-- Support guest practice locally, then offer account sign-in for durable progress. Use the profile display name and avatar only where identity is useful, honor profile privacy. The account nickname comes from `GET /api/v1/users/{id}/profile`; the client sends no presence heartbeats (the platform has no per-game presence endpoint).
-- Store accessibility, audio, graphics tier, tutorial completion, camera preference, and rules options through per-game settings. Declare desktop action bindings and read player overrides; touch mappings remain responsive UI controls.
-- Cloud-save progression as a versioned, checksummed document to the single `/api/v1/me/cloud-saves/{slug}` slot (zip+base64), debounced with a pagehide flush; localStorage stays the offline cache and the remote copy wins conflicts. Never place credentials or private chat in saves.
+- Guests play locally. On `*.starhermit.com` without a token the title shows **Sign in with StarHermit**; it is hidden when signed in and when running locally.
+- Signed in, the title account line shows the profile nickname (fallback `Player <id prefix>`) and cloud-sync state, and **Invite a friend** copies `StarHermit.inviteLink()` to the clipboard with a toast. These strings are localized in all nine locales. No presence heartbeats are sent.
+- Audio levels, captions, graphics, camera shake/mode, reduced motion, high contrast, palette, text size, left-handed layout and the FPS readout are mirrored to the per-game settings KV on change; on start the platform values win over local ones.
+- Keyboard actions are declared as `control.*` lines in `starhermit.txt` (left, right, forward, back, jump, dive, pause). The game routes `keydown`/`keyup` by `event.code` through `StarHermit.loadBindings`, and the title hint and Help controls table show the effective keys. Touch and gamepad mappings are unaffected.
+- The checksummed progression document is cloud-saved in the `game:<slug>` slot: loaded remote-first on boot (strict local descendants are re-uploaded, otherwise the remote copy wins), mirrored on every local save (debounced ~2 s), flushed on `pagehide`/hidden. localStorage stays the offline cache.
 
 ### Discovery, activity, and social layer
-- Start and end launch activity so playtime is accurate. Surface entitlement or catalog state only in host-owned chrome; the game itself must remain playable without promotional interruption.
-- Provide a compact friends panel for score comparison and invitations where appropriate. Respect presence visibility and do not expose a hidden or private profile through game UI.
-- Use friend invitations and the game-invite inbox for private sessions. Text chat belongs in a collapsible, moderated panel with block/report hooks, unread state, a 10-message-per-minute-aware composer, and no chat over critical controls.
-- Offer voice rooms only as an explicit opt-in after joining a compatible conversation. Default muted, expose speaking/mute indicators, and provide leave/report controls. Core rules must never require voice.
+- Entitlement or catalog state belongs to host-owned chrome; the game stays playable without promotional interruption.
+- The invite link is the social entry point. There is no in-game chat or voice: `server.js` is a self-hosted dev server, not a platform game script, so there are no platform sessions to attach a chat conversation to.
 
 ### Achievements and leaderboards
 - Declare a small static achievement set: first completion, mechanic mastery, a sustained streak, a difficult content milestone, and an accessibility-neutral long-term goal. Keys are stable, lowercase identifiers; unlocks are idempotent.
 - Provide global and friends-filtered boards for the primary metric plus a fair daily/weekly board. Include ruleset, content version, seed, assists, and duration with every submission; reject impossible or stale-version scores.
 - Competitive outcomes, rating changes, and achievement unlocks are server-authoritative. Never accept a client-supplied winner, score, hidden state, or elapsed time as truth.
+- The client never submits platform scores or achievements; achievements and daily bests stay in the cloud-saved progression document. With no server-reported scores there is no platform leaderboard or achievements screen.
 
 ### Sessions and transport
-- Create Realtime Rooms for lobbies, invitations, quick join, AI seats where valid, seat assignment, start, backfill policy, and results. Bind the room to an authoritative scripted session for rules and achievement delivery.
-- Send high-frequency input/state frames over the realtime WebSocket. Use compact binary gameplay frames and JSON control frames only for lifecycle events. Configure tick rate from actual simulation needs, apply sequence numbers, input acknowledgements, interpolation, bounded prediction, and reconnect snapshots.
-- Use the opaque peer relay only for non-authoritative ephemeral data that benefits from direct fan-out, such as cursors or drawing strokes; never use relay packets as the source of truth for score, collision, roles, or inventory.
+- On-platform play is local against AI racers. The dev server's custom `/ws` rooms (lobbies, quick join, authoritative simulation, binary input frames, reconnect snapshots) run only when the game is served by `node server.js` without a token. The client does not use platform sessions, matchmaking, realtime rooms or peer relay, because `server.js` is not a platform game script.
 
 ### Publishing and operations
 - Keep the authoritative script inside the distribution and declare it with `server=server.js`. Choose a digest-pinned container only if profiling proves the sandbox unsuitable; no initial design here requires one.

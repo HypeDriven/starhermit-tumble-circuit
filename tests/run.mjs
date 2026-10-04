@@ -400,21 +400,22 @@ section('save migration + checksum + conflict resolution');
   ok(resolveCloudConflict(a, b).startsWith('conflict'), 'diverged saves conflict');
 }
 
-section('platform cloud-save codec (stored zip)');
+section('platform cloud-save codec (canonical SDK zip)');
 {
-  const { zipStore, unzipFirstEntry, bytesToBase64, base64ToBytes, decodeJwtPayload } = await import('../js/platform/platform.js');
+  // The zip/base64/JWT helpers now live in the canonical StarHermit SDK.
+  const { readFileSync } = await import('node:fs');
+  const m = { exports: {} };
+  new Function('module', 'exports', readFileSync(new URL('../starhermit-sdk.js', import.meta.url), 'utf8'))(m, m.exports);
+  const sh = m.exports;
   const doc = { version: 1, journey: { unlocked: 3, passed: { j01: 120 }, crowns: {} }, stats: { races: 7 } };
-  const bytes = new TextEncoder().encode(JSON.stringify(doc));
-  const zip = zipStore('save.json', bytes);
+  const zip = sh._zip('save.json', new TextEncoder().encode(JSON.stringify(doc)));
   ok(zip[0] === 0x50 && zip[1] === 0x4b, 'cloud payload starts with local-file magic');
-  const back = JSON.parse(new TextDecoder().decode(unzipFirstEntry(zip)));
+  const back = JSON.parse(new TextDecoder().decode(await sh._unzip(zip)));
   ok(JSON.stringify(back) === JSON.stringify(doc), 'stored zip round-trips the save doc');
-  const b64 = bytesToBase64(zip);
-  ok(Array.from(base64ToBytes(b64)).join(',') === Array.from(zip).join(','), 'base64 helpers round-trip');
-  const tok = 'eyJhbGciOiJub25lIn0.' + bytesToBase64(new TextEncoder().encode(JSON.stringify({ sub: 'u1234567890', game_scope: 'tumble-circuit' }))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '') + '.sig';
-  const claims = decodeJwtPayload(tok);
+  const tok = 'eyJhbGciOiJub25lIn0.' + Buffer.from(JSON.stringify({ sub: 'u1234567890', game_scope: 'tumble-circuit' })).toString('base64url') + '.sig';
+  const claims = sh.decodeJwt(tok);
   ok(claims && claims.sub === 'u1234567890' && claims.game_scope === 'tumble-circuit', 'launch token payload decodes sub + game_scope');
-  ok(decodeJwtPayload('not-a-jwt') === null, 'malformed token payload rejected');
+  ok(sh.decodeJwt('not-a-jwt') === null, 'malformed token payload rejected');
 }
 
 section('content validation sweep');

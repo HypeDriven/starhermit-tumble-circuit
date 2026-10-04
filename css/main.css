@@ -227,3 +227,11 @@ body.hc #hud-objective, body.hc #hud-center, body.hc #hud-right { border: 2px so
 @media (prefers-reduced-motion: reduce) {
   #hud-progress-fill { transition: none; }
 }
+
+/* ---------------- StarHermit toast (invite copied / signed out) ---------------- */
+.toast {
+  position: fixed; left: 50%; bottom: calc(24px + var(--sab)); transform: translateX(-50%);
+  max-width: min(92vw, 520px); padding: 10px 16px; z-index: 30;
+  background: var(--panel-solid); color: var(--text); border: 1px solid var(--accent);
+  border-radius: 10px; text-align: center; overflow-wrap: anywhere; pointer-events: none;
+}

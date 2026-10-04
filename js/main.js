@@ -1,13 +1,14 @@
 // Bootstrap: capability detection, module wiring, lifecycle. The game runs
-// fully offline (guest practice); StarHermit platform integration (launch
-// token, profile, cloud save) activates when a token is present, and the
+// fully offline (guest practice); StarHermit platform integration (SDK launch
+// token, profile, cloud save, settings, bindings) activates when a token is
+// present, and the
 // custom-protocol hosted rooms are a local-dev-server feature only. If WebGL
 // is unavailable we show a clear compatibility message and preserve local
 // session state.
 
 import { GameScene } from './render/scene.js';
 import { AudioEngine } from './audio/audio.js';
-import { App } from './ui/app.js';
+import { App, DEFAULT_BINDINGS } from './ui/app.js';
 import { loadSave, persistSave, migrateSave, resolveCloudConflict } from './platform/store.js';
 import { syncTime } from './platform/timeSync.js';
 import { HostedClient } from './platform/net.js';
@@ -41,6 +42,8 @@ async function boot() {
         store.save = persistSave(migrateSave(remote));
         platform.setStatus('synced');
       }
+    } else {
+      platform.setStatus('synced'); // nothing in the cloud slot yet
     }
   }
 
@@ -54,15 +57,23 @@ async function boot() {
   const audio = new AudioEngine();
   const hosted = new HostedClient();
   const app = new App({ scene, audio, store, hosted, platform });
+  if (platform.active) {
+    // Platform settings win over local ones; bindings honour player overrides.
+    const [remote, bindings] = await Promise.all([platform.getSettings(), platform.loadBindings(DEFAULT_BINDINGS)]);
+    app.adoptRemoteSettings(remote);
+    app.setBindings(bindings);
+  }
   app.start();
 
   // host handshake: synchronize the daily boundary clock (authenticated when
   // hosted); offline is fine. Funnel events stay local no-ops — the platform
   // has no per-game telemetry/presence endpoints reachable by launch tokens.
-  syncTime(platform.active ? (input, init) => platform.apiFetch(input, init) : undefined)
-    .then((r) => {
+  // Standalone play makes no network calls: the local clock is used.
+  if (platform.active) {
+    syncTime((input) => platform.apiFetch(input)).then((r) => {
       if (!r.ok) console.info('time sync unavailable:', r.reason);
     });
+  }
 }
 
 boot().catch(e => { console.error(e); fatal('Unexpected boot error: ' + e.message); });

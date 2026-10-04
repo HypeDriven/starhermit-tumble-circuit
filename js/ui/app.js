@@ -12,6 +12,7 @@ import { TICK_RATE, rankPlayers, PSTATE } from '../rules/sim.js';
 import { utcDateString, msUntilNextUtcDay } from '../platform/timeSync.js';
 import { PRESETS, CATEGORIES, presetTier, choosePreset } from '../render/gfx.js';
 import { gfxStrings } from './gfxStrings.js';
+import { platformStrings } from './platformStrings.js';
 
 const $ = (sel) => document.querySelector(sel);
 const el = (id) => document.getElementById(id);
@@ -27,6 +28,28 @@ export const ACHIEVEMENTS = {
   long_haul: { name: 'Long Haul', desc: 'Finish 50 races (any mode).' },
 };
 
+// Keyboard actions — declared as control.* lines in starhermit.txt; hosted
+// players may override them on StarHermit.
+export const DEFAULT_BINDINGS = {
+  left: ['KeyA', 'ArrowLeft'],
+  right: ['KeyD', 'ArrowRight'],
+  forward: ['KeyW', 'ArrowUp'],
+  back: ['KeyS', 'ArrowDown'],
+  jump: ['Space', 'KeyK'],
+  dive: ['ShiftLeft', 'ShiftRight', 'KeyL'],
+  pause: ['Escape', 'KeyP'],
+};
+const KEY_GLYPHS = { ArrowLeft: '←', ArrowRight: '→', ArrowUp: '↑', ArrowDown: '↓', Escape: 'Esc', ShiftLeft: 'Shift', ShiftRight: 'Right Shift' };
+function keyLabel(code) {
+  if (KEY_GLYPHS[code]) return KEY_GLYPHS[code];
+  if (/^Key[A-Z]$/.test(code)) return code.slice(3);
+  if (/^Digit\d$/.test(code)) return code.slice(5);
+  return code;
+}
+// Player preferences mirrored to the StarHermit settings KV.
+const SYNCED_SETTINGS = ['music', 'effects', 'ambience', 'voice', 'gfx', 'reducedMotion', 'highContrast', 'palette',
+  'textScale', 'leftHanded', 'cameraShake', 'captions', 'camera', 'showFps'];
+
 export class App {
   constructor({ scene, audio, store, save, hosted, platform }) {
     this.scene = scene;
@@ -37,7 +60,9 @@ export class App {
     this.screen = 'title';
     this.round = null;
     this.show = null;
-    this.keys = {};
+    this.keys = {};          // action -> held
+    this.setBindings(DEFAULT_BINDINGS);
+    this.pt = platformStrings(navigator.language);
     this.touch = { active: false, mx: 0, mz: 0, jump: false, dive: false };
     this.lastFocus = null;
     this.frame = this.frame.bind(this);
@@ -57,7 +82,13 @@ export class App {
   start() {
     this.bindInput();
     this.applySettings();
-    if (this.platform) this.platform.onStatus = () => this.renderAccountLine();
+    if (this.platform) {
+      this.platform.onStatus = () => this.renderAccountLine();
+      this.platform.onAuthChange = () => {
+        this.toast(this.pt('signedOut'));
+        if (el('title-h')) this.showTitle();
+      };
+    }
     this.showTitle();
     this.prevTime = performance.now();
     requestAnimationFrame(this.frame);
@@ -99,17 +130,20 @@ export class App {
   bindInput() {
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
-      const k = e.key.toLowerCase();
-      this.keys[k] = true;
-      if (k === 'escape' || k === 'p') { this.togglePause(); e.preventDefault(); }
+      const action = this.codeAction[e.code];
+      if (action) this.keys[action] = true;
+      if (action === 'pause') { this.togglePause(); e.preventDefault(); }
       // keep gameplay keys from scrolling the page while a round is running,
       // but never steal them from a focused control (space activates buttons)
       const onControl = e.target && e.target.closest && e.target.closest('button, input, select, textarea, a[href]');
-      if (this.round && !onControl &&
-          (k === ' ' || k === 'arrowup' || k === 'arrowdown' || k === 'arrowleft' || k === 'arrowright')) e.preventDefault();
-      if (k === ' ' || k === 'enter') this.audio.start();
+      if (this.round && !onControl && action && action !== 'pause' && action !== 'dive') e.preventDefault();
+      if (e.key === ' ' || e.key === 'Enter') this.audio.start();
     });
-    window.addEventListener('keyup', (e) => { this.keys[e.key.toLowerCase()] = false; });
+    window.addEventListener('keyup', (e) => {
+      const action = this.codeAction[e.code];
+      if (action) this.keys[action] = false;
+    });
+    window.addEventListener('blur', () => { this.keys = {}; });
     window.addEventListener('pointerdown', () => this.audio.start(), { once: true });
     window.addEventListener('resize', () => this.scene.resize());
     document.addEventListener('visibilitychange', () => {
@@ -196,10 +230,10 @@ export class App {
 
   readMoveInput() {
     let mx = 0, mz = 0;
-    if (this.keys['arrowleft'] || this.keys['a']) mx -= 1;
-    if (this.keys['arrowright'] || this.keys['d']) mx += 1;
-    if (this.keys['arrowup'] || this.keys['w']) mz += 1;
-    if (this.keys['arrowdown'] || this.keys['s']) mz -= 0.6;
+    if (this.keys.left) mx -= 1;
+    if (this.keys.right) mx += 1;
+    if (this.keys.forward) mz += 1;
+    if (this.keys.back) mz -= 0.6;
     if (this.touch.mx || this.touch.mz) { mx = this.touch.mx; mz = this.touch.mz; }
     if (this.padMove && (this.padMove.mx || this.padMove.mz)) { mx = this.padMove.mx; mz = this.padMove.mz; }
     const m = Math.hypot(mx, mz);
@@ -209,8 +243,8 @@ export class App {
 
   readActionInput() {
     return {
-      jump: !!(this.keys[' '] || this.keys['k'] || this.touch.jump || (this.padButtons && this.padButtons.jump)),
-      dive: !!(this.keys['shift'] || this.keys['l'] || this.touch.dive || (this.padButtons && this.padButtons.dive)),
+      jump: !!(this.keys.jump || this.touch.jump || (this.padButtons && this.padButtons.jump)),
+      dive: !!(this.keys.dive || this.touch.dive || (this.padButtons && this.padButtons.dive)),
     };
   }
 
@@ -635,9 +669,11 @@ export class App {
           <div class="row" style="justify-content:center">
             <button data-act="settings">Settings</button>
             <button data-act="help">Help</button>
+            ${this.platform && this.platform.canSignIn() ? `<button data-act="signin" id="btn-signin">${esc(this.pt('signIn'))}</button>` : ''}
+            ${this.platform && this.platform.active && this.platform.inviteLink() ? `<button data-act="invite" id="btn-invite">${esc(this.pt('invite'))}</button>` : ''}
           </div>
         </div>
-        <p class="small muted mt">${'ontouchstart' in window ? 'Drag the stick (bottom-left) to move · Jump and Dive buttons (bottom-right)' : 'WASD/arrows move · Space jump · Shift dive · Esc pause'}</p>
+        <p class="small muted mt">${'ontouchstart' in window ? 'Drag the stick (bottom-left) to move · Jump and Dive buttons (bottom-right)' : `${esc(this.keysFor('forward', 'left', 'back', 'right'))} move · ${esc(this.keysFor('jump'))} jump · ${esc(this.keysFor('dive'))} dive · ${esc(this.keysFor('pause'))} pause`}</p>
       </div>`);
     this.onAction('play', () => this.showModes());
     this.onAction('daily', () => this.startDaily());
@@ -645,6 +681,8 @@ export class App {
     this.onAction('learn', () => this.showLearn());
     this.onAction('settings', () => this.showSettings(() => this.showTitle()));
     this.onAction('help', () => this.showHelp(() => this.showTitle()));
+    this.onAction('signin', () => this.platform.signIn());
+    this.onAction('invite', () => this.copyInvite());
     this.renderAccountLine();
     if (!this.attractState) this.buildAttract();
   }
@@ -964,7 +1002,7 @@ export class App {
           <button data-act="replay-tutorial">Replay tutorial</button>
         </div>
       </div>`);
-    const bind = (id, fn) => el(id).addEventListener('change', (e) => { fn(e.target); this.store.persist(); this.applySettings(); this.audio.event({ t: 'ui' }); });
+    const bind = (id, fn) => el(id).addEventListener('change', (e) => { fn(e.target); this.store.persist(); this.applySettings(); this.pushSettings(); this.audio.event({ t: 'ui' }); });
     bind('set-music', t => s.music = +t.value);
     bind('set-effects', t => s.effects = +t.value);
     bind('set-ambience', t => s.ambience = +t.value);
@@ -1015,6 +1053,7 @@ export class App {
     const commit = (next, id) => {
       s.gfx = next;
       this.store.persist();
+      this.pushSettings();
       this.scene.setGraphics(next);
       this.audio.event({ t: 'ui' });
       this.renderGraphicsSection(id);
@@ -1058,10 +1097,10 @@ export class App {
         <p>Race to the finish gate before the cutoff. Green rings are checkpoints — falling returns you to your last ring. In survival arenas, stay on the disc: last tumbler standing wins.</p>
         <h2>Controls</h2>
         <table class="score" aria-label="Controls">
-          <tr><td>Move</td><td>W A S D / arrows / left stick / touch stick</td></tr>
-          <tr><td>Jump</td><td>Space / K / gamepad A / Jump button</td></tr>
-          <tr><td>Dive</td><td>Shift / L / gamepad B / Dive button</td></tr>
-          <tr><td>Pause</td><td>Esc / P / gamepad Start</td></tr>
+          <tr><td>Move</td><td>${esc(this.keysFor('forward', 'left', 'back', 'right'))} / left stick / touch stick</td></tr>
+          <tr><td>Jump</td><td>${esc(this.keysFor('jump'))} / gamepad A / Jump button</td></tr>
+          <tr><td>Dive</td><td>${esc(this.keysFor('dive'))} / gamepad B / Dive button</td></tr>
+          <tr><td>Pause</td><td>${esc(this.keysFor('pause'))} / gamepad Start</td></tr>
         </table>
         <h2>Rules cards</h2>
         <p>Jump clears gaps up to ~3.5m. Dive mid-air to lunge across wider gaps — you need a moment to get up after landing. Spinning bars, swinging hammers, pistons and bumpers knock you flying; weave walls only open where the gap is. Conveyor belts and fans push you — lean against them. After a hit you flash briefly: nothing can knock you again during the flash.</p>
@@ -1108,6 +1147,67 @@ export class App {
     c.classList.remove('hidden');
     clearTimeout(this.captionTimer);
     this.captionTimer = setTimeout(() => c.classList.add('hidden'), 1400);
+  }
+
+  // ---- StarHermit: bindings, settings KV, invite ----
+  setBindings(bindings) {
+    this.bindings = bindings;
+    this.codeAction = {};
+    for (const [action, codes] of Object.entries(bindings)) for (const c of codes) this.codeAction[c] = action;
+    this.keys = {};
+  }
+
+  keysFor(...actions) {
+    return actions.map(a => (this.bindings[a] || []).map(keyLabel).join('/')).join(' ');
+  }
+
+  adoptRemoteSettings(remote) {
+    if (!remote || typeof remote !== 'object') return;
+    const s = this.settings;
+    let changed = false;
+    for (const k of SYNCED_SETTINGS) {
+      const v = remote[k];
+      if (v === undefined || v === null || typeof v !== typeof s[k]) continue;
+      s[k] = v;
+      changed = true;
+    }
+    if (changed) this.store.persist();
+  }
+
+  pushSettings() {
+    if (!this.platform || !this.platform.active) return;
+    clearTimeout(this.settingsTimer);
+    this.settingsTimer = setTimeout(() => {
+      const out = {};
+      for (const k of SYNCED_SETTINGS) out[k] = this.settings[k];
+      this.platform.patchSettings(out);
+    }, 500);
+  }
+
+  async copyInvite() {
+    const link = this.platform && this.platform.inviteLink();
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      this.toast(this.pt('inviteCopied'));
+    } catch {
+      this.toast(this.pt('inviteFailed', { link }));
+    }
+  }
+
+  toast(text) {
+    let t = el('toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'toast';
+      t.className = 'toast';
+      t.setAttribute('role', 'status');
+      document.getElementById('app').appendChild(t);
+    }
+    t.textContent = text;
+    t.classList.remove('hidden');
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => t.classList.add('hidden'), 3500);
   }
 
   profileName() { return (this.platform && this.platform.nickname) || 'You'; }
