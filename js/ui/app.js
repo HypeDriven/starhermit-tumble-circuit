@@ -178,14 +178,17 @@ export class App {
       zone.setPointerCapture(e.pointerId);
       base.classList.add('active');
       base.style.bottom = 'auto';
-      base.style.left = (e.clientX - 55 - zone.getBoundingClientRect().left) + 'px';
-      base.style.top = (e.clientY - 55 - zone.getBoundingClientRect().top) + 'px';
+      // client/rect coords are visual px; the zoomed touch layer wants layout px
+      const zr = zone.getBoundingClientRect(), k = window.UIScale?.value || 1;
+      base.style.left = ((e.clientX - zr.left) / k - 55) + 'px';
+      base.style.top = ((e.clientY - zr.top) / k - 55) + 'px';
       if (hint) hint.classList.add('hidden'); // first drag: the cue has done its job
       this.audio.start();
     });
     zone.addEventListener('pointermove', (e) => {
       if (e.pointerId !== stickId || !origin) return;
-      const dx = (e.clientX - origin.x) / 45, dy = (e.clientY - origin.y) / 45;
+      const k = window.UIScale?.value || 1;
+      const dx = (e.clientX - origin.x) / (45 * k), dy = (e.clientY - origin.y) / (45 * k);
       const m = Math.hypot(dx, dy) || 1;
       const c = Math.min(1, m);
       this.touch.mx = (dx / m) * c;
@@ -640,7 +643,9 @@ export class App {
   overlay(html) {
     el('screens').innerHTML = `<div class="screen">${html}</div>`;
     const first = el('screens').querySelector('button');
-    if (first) first.focus();
+    // focusing must not scroll a tall panel (settings, results) past its heading
+    if (first) first.focus({ preventScroll: true });
+    for (const n of el('screens').querySelectorAll('.screen, .panel')) n.scrollTop = 0;
   }
 
   onAction(act, fn) {
