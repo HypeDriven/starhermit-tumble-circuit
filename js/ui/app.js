@@ -468,7 +468,23 @@ export class App {
     }
 
     this.store.persist();
+    this.postToLeaderboard(me.total);
     this.showResultsScreen({ headline, res, me, breakdown, nextAction });
+  }
+
+  // Signed in only: post a finished local round against the AI (not lessons or
+  // dev-server rooms) to the platform high-score board; results show the rank.
+  postToLeaderboard(total) {
+    this.lbText = null;
+    const token = this.lbToken = {};
+    if (!this.platform || !this.platform.active || this.round.lesson || this.hostedRound) return;
+    this.lbText = this.pt('lbPosting');
+    this.platform.submitScore(Math.max(0, total)).then((r) => {
+      if (token !== this.lbToken) return;
+      this.lbText = !r.posted ? this.pt('lbFailed') : r.rank ? this.pt('lbRank', { rank: r.rank }) : this.pt('lbPosted');
+      const el = document.getElementById('results-lb');
+      if (el) el.textContent = this.lbText;
+    });
   }
 
   showResultsScreen({ headline, res, me, breakdown, nextAction }) {
@@ -496,6 +512,7 @@ export class App {
         </table>
         <h2>Standings</h2>
         <table class="score" aria-label="Round standings"><tr><th>Player</th><th>Result</th><th>Score</th></tr>${rows}</table>
+        ${this.lbText != null ? `<p id="results-lb" aria-live="polite">${esc(this.lbText)}</p>` : ''}
         <p class="small muted">Replay integrity: ${replayCheck.ok ? 'verified deterministic' : 'mismatch (' + replayCheck.reason + ')'} · seed ${this.round.def.seed}</p>
         <div class="row mt">
           ${nextAction ? `<button class="primary" data-act="next">${esc(nextAction.label)}</button>` : ''}
