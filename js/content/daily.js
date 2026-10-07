@@ -1,12 +1,16 @@
 // Daily challenge: one shared seed and ruleset per UTC day. The seed is
 // derived from the date string only, so every player on the planet gets the
-// identical course. Seeds are immutable after publication; a defective day
-// is marked excluded rather than replaced.
+// identical course. Every candidate course is proven finishable by the
+// offline probe bot before it is served; a candidate that fails is re-rolled
+// deterministically (salted seed), so all clients still agree. Days whose
+// first candidate passes are unaffected. Published days are immutable; a
+// defective published day is marked excluded rather than replaced.
 
 import { Rng, hashString } from '../rules/rng.js';
 import { seg } from '../rules/course.js';
 import { makeCourse } from './stages.js';
 import { THEME_IDS } from './themes.js';
+import { validateStructure, validateSolvable } from './validate.js';
 
 export const DAILY_RULESET = 1;
 
@@ -34,8 +38,31 @@ const POOL = [
   ['mover', 12, (r) => ({ omega: r.range(0.026, 0.032), pw: r.range(3.0, 3.4) })],
 ];
 
+// Re-roll budget per day. Candidate 0 is the original derivation; candidate
+// k > 0 salts the seed string with '#k'.
+export const DAILY_MAX_CANDIDATES = 8;
+// Days before this were published under the original derivation and stay
+// exactly as served (immutable history).
+export const DAILY_REROLL_FROM = '2026-10-07';
+const cache = new Map();
+
 export function dailyDef(dateStr = dailyDateString()) {
-  const seed = hashString('tumble-daily-' + dateStr);
+  let def = cache.get(dateStr);
+  if (!def) {
+    const budget = dateStr < DAILY_REROLL_FROM ? 1 : DAILY_MAX_CANDIDATES;
+    for (let k = 0; k < budget && !def; k++) {
+      const cand = dailyCandidate(dateStr, k);
+      if (!validateStructure(cand).errors.length && validateSolvable(cand).finished) def = cand;
+    }
+    // every candidate failed the probe: serve the original (validators flag it)
+    if (!def) def = dailyCandidate(dateStr, 0);
+    cache.set(dateStr, def);
+  }
+  return structuredClone(def);
+}
+
+export function dailyCandidate(dateStr, k = 0) {
+  const seed = hashString('tumble-daily-' + dateStr + (k ? '#' + k : ''));
   const rng = new Rng(seed, 'daily');
   const theme = THEME_IDS[seed % THEME_IDS.length];
   const segments = [seg('run', rng.int(8, 12))];
@@ -54,6 +81,7 @@ export function dailyDef(dateStr = dailyDateString()) {
   segments.push(seg('run', 8));
   const def = makeCourse(dailyId(dateStr), theme, seed, [...mech], segments);
   def.daily = dateStr;
+  def.dailyCandidate = k;
   def.ruleset = DAILY_RULESET;
   return def;
 }

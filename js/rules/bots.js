@@ -27,6 +27,17 @@ function raceThink(state, p, per, out) {
   // base lane target with gentle deterministic wander
   let targetX = per.lane * (half - 1.6) + dsin(tick * 0.011 + per.wob) * 0.9;
   let speedMul = 0.82 + per.aggr * 0.18;
+  // keep the lane inside the static floor here and just ahead, so wide-lane
+  // personas follow the track onto narrow sections instead of walking off
+  {
+    let lo = -half, hi = half;
+    for (const dz of [0, 1.5, 3.0]) {
+      const pl = staticPlatformNear(course, p.x, p.z + dz);
+      if (pl) { lo = Math.max(lo, pl.x0); hi = Math.min(hi, pl.x1); }
+    }
+    if (hi - lo >= 1.8) targetX = clamp(targetX, lo + 0.9, hi - 0.9);
+    else if (hi > lo) targetX = (lo + hi) / 2;
+  }
 
   // ---- hazard avoidance (nearest threat of each kind dominates)
   let weaveHandled = -1; // dz of nearest weave wall already handled
@@ -109,7 +120,14 @@ function raceThink(state, p, per, out) {
   if (p.grounded) {
     const near = groundAt(course, p.x, p.z + 0.9, tick);
     const probe = groundAt(course, p.x, p.z + lookAhead, tick);
-    if (near && near.mover) {
+    // void straight ahead but solid static floor continues to one side (the
+    // track narrows or shifts): that is not a lip — sidestep onto the floor
+    const sideX = (!near || !probe) && !(near && near.mover) ? lateralFloorX(course, p.x, p.z, lookAhead, half, tick) : null;
+    if (sideX != null) {
+      targetX = sideX;
+      dodgeX = null;
+      speedMul = near ? Math.min(speedMul, 0.3) : 0; // never walk off the lip while realigning
+    } else if (near && near.mover) {
       // riding a moving platform: hold near its front edge, then jump toward
       // the nearest landing surface ahead (static or another platform),
       // evaluated at the moment we would land
@@ -233,6 +251,38 @@ function raceThink(state, p, per, out) {
 
   out.mx = clamp((targetX - p.x) * 0.9, -1, 1);
   out.mz = clamp(speedMul, -1, 1);
+}
+
+// Static (non-moving) rectangular platform covering z, nearest to x in x.
+function staticPlatformNear(course, x, z) {
+  let best = null, bestD = Infinity;
+  for (const pl of course.platforms) {
+    if (pl.disc || z < pl.z0 || z > pl.z1) continue;
+    const d = x < pl.x0 ? pl.x0 - x : (x > pl.x1 ? x - pl.x1 : 0);
+    if (d < bestD) { bestD = d; best = pl; }
+  }
+  return best;
+}
+
+// Nearest lateral position (with a margin inside the edge) where static floor
+// runs from just ahead through the look-ahead point; null when the void spans
+// the whole track width (a real gap/mover crossing).
+function lateralFloorX(course, x, z, lookAhead, half, tick) {
+  const solid = (qx) => {
+    const a = groundAt(course, qx, z + 0.9, tick), b = groundAt(course, qx, z + lookAhead, tick);
+    return a && b && !a.mover && !b.mover;
+  };
+  for (let d = 0.3; d <= half * 2; d += 0.3) {
+    for (const s of [-1, 1]) {
+      const qx = x + s * d;
+      if (qx < -half || qx > half) continue;
+      if (solid(qx)) {
+        const inX = clamp(qx + s * 0.9, -(half - 0.9), half - 0.9);
+        return solid(inX) ? inX : qx;
+      }
+    }
+  }
+  return null;
 }
 
 function survivalThink(state, p, per, out) {

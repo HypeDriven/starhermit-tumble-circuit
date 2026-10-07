@@ -12,7 +12,7 @@ import { roundResults, placePoints } from '../js/rules/scoring.js';
 import { createShow, applyRoundResult, showTable, isFinalRound } from '../js/rules/show.js';
 import { Recorder, verify } from '../js/rules/replay.js';
 import { JOURNEY, LESSONS, SHOW_COURSES, SHOWS, CHALLENGES, ARENAS, courseById, challengeCourse, makeCourse } from '../js/content/stages.js';
-import { dailyDef, dailyDateString } from '../js/content/daily.js';
+import { dailyDef, dailyDateString, DAILY_REROLL_FROM } from '../js/content/daily.js';
 import { validateAll, validateStructure, validateSolvable } from '../js/content/validate.js';
 import { seg } from '../js/rules/course.js';
 
@@ -431,6 +431,18 @@ section('content validation sweep');
   for (const e of report.errors) console.log('  error:', e);
   ok(report.ok, 'all content valid and solvable');
   ok(JOURNEY.length === 40, 'exactly 40 journey stages');
+  // every daily from 30 days back to a year ahead must be finishable (the
+  // generator re-rolls deterministically from DAILY_REROLL_FROM onward)
+  {
+    const bad = [];
+    const d = new Date(); d.setUTCDate(d.getUTCDate() - 30);
+    for (let i = 0; i < 396; i++, d.setUTCDate(d.getUTCDate() + 1)) {
+      const ds = dailyDateString(d), def = dailyDef(ds);
+      if (!validateSolvable(def).finished) bad.push(ds);
+      if (ds < DAILY_REROLL_FROM && def.dailyCandidate !== 0) bad.push(ds + ' (published day re-rolled)');
+    }
+    ok(bad.length === 0, 'dailies -30..+365 days all finishable' + (bad.length ? ': ' + bad.join(', ') : ''));
+  }
   ok(LESSONS.length === 5, 'five lessons');
   ok(CHALLENGES.length === 6, 'six challenges');
 }

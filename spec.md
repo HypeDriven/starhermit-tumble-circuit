@@ -53,6 +53,7 @@ Authoritative checkpoints determine qualification; finals use finish order or su
 - Difficulty is measured from solution depth, branching factor, time pressure, motor precision, hidden information, and recovery options—not merely larger numbers.
 - Introduce one new concept in isolation, combine it with one known concept, then test mastery before adding another.
 - Daily seeds are immutable after publication. If content is defective, mark the day excluded from ranking rather than silently replacing it.
+- Daily generation is validated before publication: from 2026-10-07 (`DAILY_REROLL_FROM`) each day's course must pass the offline probe bot, otherwise the generator deterministically re-rolls with a salted seed (`tumble-daily-<date>#k`, up to 8 candidates), so every client still gets the same course. Days before the cutoff keep their original derivation. This changed five not-yet-published 2027 dailies (01-08, 02-21, 05-25, 07-01, 09-02); every other day from 2026-09-07 to 2027-10-07 is unchanged. `npm test` checks every daily from 30 days back to 365 days ahead. Because acceptance depends on the bot and sim, any bot/sim change must keep already-published days unchanged.
 
 ### Game-state model
 
