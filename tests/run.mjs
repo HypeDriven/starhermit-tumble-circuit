@@ -398,6 +398,7 @@ section('save migration + checksum + conflict resolution');
   const a = migrateSave({ journey: { unlocked: 5, passed: { j01: 1 } } });
   const b = migrateSave({ journey: { unlocked: 5, passed: { j02: 1 } } });
   ok(resolveCloudConflict(a, b).startsWith('conflict'), 'diverged saves conflict');
+  ok(resolveCloudConflict({ ...sup, updatedAt: 1 }, { ...sub, daily: { d: 5 }, updatedAt: 2 }) === 'remote', 'newer remote updatedAt wins over local progression superset');
 }
 
 section('platform cloud-save codec (canonical SDK zip)');

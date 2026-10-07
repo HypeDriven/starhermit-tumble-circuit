@@ -84,12 +84,18 @@ export function persistSave(doc) {
   return out;
 }
 
-// Conflict resolution helper: given two documents, returns 'local' when the
+// Conflict resolution helper: when both documents carry updatedAt (stamped on
+// every game write) the strictly newer local doc returns 'local' and anything
+// else 'remote', so dailies/challenges/stats played on another device are not
+// reverted. Legacy docs without it fall back to progression: 'local' when the
 // local doc strictly descends from remote (superset of progression), 'remote'
-// likewise, or a 'conflict-*' verdict when neither does. The cloud loader
-// (js/main.js) mirrors a 'local' win upward and otherwise keeps the remote
-// copy, per the platform's remote-preferred conflict policy.
+// likewise (and on ties), or a 'conflict-*' verdict when neither does. The
+// cloud loader (js/main.js) mirrors a 'local' win upward and otherwise keeps
+// the remote copy, per the platform's remote-preferred conflict policy.
 export function resolveCloudConflict(local, remote) {
+  if (typeof local.updatedAt === 'number' && typeof remote.updatedAt === 'number') {
+    return local.updatedAt > remote.updatedAt ? 'local' : 'remote';
+  }
   const score = (d) => Object.keys(d.journey.passed || {}).length +
     Object.keys(d.lessonsDone || {}).length + Object.keys(d.challengesDone || {}).length +
     Object.keys(d.achievements || {}).length;
@@ -98,7 +104,7 @@ export function resolveCloudConflict(local, remote) {
     for (const k of Object.keys(b.lessonsDone || {})) if (!a.lessonsDone[k]) return false;
     return true;
   };
-  if (covers(local, remote)) return 'local';
   if (covers(remote, local)) return 'remote';
+  if (covers(local, remote)) return 'local';
   return score(local) >= score(remote) ? 'conflict-local-newer' : 'conflict-remote-newer';
 }

@@ -25,7 +25,9 @@ async function boot() {
   platform.init();
 
   // localStorage stays the offline cache; when hosted, the cloud slot wins.
+  // Every game write stamps updatedAt; the start-up cloud compare uses it.
   const store = { save: loadSave(), persist() {
+    store.save.updatedAt = Date.now();
     store.save = persistSave(store.save);
     platform.scheduleSave(store.save);
   } };
