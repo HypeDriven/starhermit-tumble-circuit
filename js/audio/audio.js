@@ -37,7 +37,7 @@ export class AudioEngine {
       const g = this.ctx.createGain();
       g.gain.value = this.volumes[b];
       g.connect(master);
-      this.buses[b] = g;
+      this.buses[b] = (globalThis.GameOptions ? globalThis.GameOptions.tagBus(g, b) : g);
     }
     this.started = true;
     this.startAmbience();
@@ -79,7 +79,7 @@ export class AudioEngine {
     if (!this.started || !this.enabled.effects) return false;
     const buf = this.sfxBuffers.get(name);
     if (!buf) { this.loadSample(name); return false; }
-    const src = this.ctx.createBufferSource();
+    const src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(this.ctx.createBufferSource(), name) : this.ctx.createBufferSource());
     src.buffer = buf;
     src.connect(this.buses.effects);
     src.start();
@@ -101,7 +101,7 @@ export class AudioEngine {
   blip({ f0 = 440, f1 = null, dur = 0.12, type = 'square', vol = 0.5, bus = 'effects', when = 0 }) {
     if (!this.started || !this.enabled.effects) return;
     const t = this.ctx.currentTime + when;
-    const o = this.ctx.createOscillator();
+    const o = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(this.ctx.createOscillator(), bus) : this.ctx.createOscillator());
     const g = this.ctx.createGain();
     o.type = type;
     o.frequency.setValueAtTime(f0, t);
@@ -119,7 +119,7 @@ export class AudioEngine {
     const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
     const d = buf.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * (1 - i / len);
-    const src = this.ctx.createBufferSource(); src.buffer = buf;
+    const src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(this.ctx.createBufferSource(), bus) : this.ctx.createBufferSource()); src.buffer = buf;
     const f = this.ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = freq; f.Q.value = q;
     const g = this.ctx.createGain(); g.gain.value = vol;
     src.connect(f); f.connect(g); g.connect(this.buses[bus]);
@@ -162,7 +162,7 @@ export class AudioEngine {
     const d = buf.getChannelData(0);
     let v = 0;
     for (let i = 0; i < len; i++) { v = v * 0.98 + (Math.random() * 2 - 1) * 0.02; d[i] = v * 8; }
-    const src = this.ctx.createBufferSource(); src.buffer = buf; src.loop = true;
+    const src = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(this.ctx.createBufferSource(), null) : this.ctx.createBufferSource()); src.buffer = buf; src.loop = true;
     const f = this.ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 500;
     const g = this.ctx.createGain(); g.gain.value = 0.5;
     src.connect(f); f.connect(g); g.connect(this.buses.ambience);
@@ -200,7 +200,7 @@ export class AudioEngine {
   tone(freq, dur, type, vol) {
     if (!this.enabled.music) return;
     const t = this.ctx.currentTime;
-    const o = this.ctx.createOscillator(); o.type = type; o.frequency.value = freq;
+    const o = (globalThis.GameOptions ? globalThis.GameOptions.trackSource(this.ctx.createOscillator(), null) : this.ctx.createOscillator()); o.type = type; o.frequency.value = freq;
     const g = this.ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + 0.03);

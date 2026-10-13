@@ -99,8 +99,8 @@ class GlowBloomPass extends UnrealBloomPass {
     const alpha = renderer.getClearAlpha();
     renderer.setClearColor(0x000000, 1);
     renderer.setRenderTarget(this.glowTarget);
-    renderer.clear();
-    renderer.render(scene, this.glowCamera);
+    (globalThis.GameOptions ? globalThis.GameOptions.draw(renderer, () => renderer.clear()) : renderer.clear());
+    (globalThis.GameOptions ? globalThis.GameOptions.draw(renderer, () => renderer.render(scene, this.glowCamera)) : renderer.render(scene, this.glowCamera));
     renderer.setClearColor(this._clear, alpha);
     scene.background = bg;
     for (const [o, m] of mats) o.material = m;
@@ -410,11 +410,11 @@ export class GameScene {
       this._buildPost(w, h);
     }
     if (this.composer) {
-      try { this.composer.render(dt / 1000); return; } catch (e) {
+      try { (globalThis.GameOptions ? globalThis.GameOptions.draw(this.composer.renderer, () => this.composer.render(dt / 1000)) : this.composer.render(dt / 1000)); return; } catch (e) {
         this.postFailed = true; this.composer = null; this.postKey = null;
       }
     }
-    this.renderer.render(this.scene, this.camera);
+    (globalThis.GameOptions ? globalThis.GameOptions.draw(this.renderer, () => this.renderer.render(this.scene, this.camera)) : this.renderer.render(this.scene, this.camera));
   }
 
   // Ambient decorative motion: clouds drift, balloons bob, aurora shimmers,
