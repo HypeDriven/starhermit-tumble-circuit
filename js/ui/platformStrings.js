@@ -1,5 +1,5 @@
 // Localized strings for the StarHermit buttons and toasts (sign-in, invite,
-// signed out). Like the Graphics panel, they follow the browser language.
+// signed out); app.js passes the game language (i18n.js locale()).
 
 import { pickLocale } from './gfxStrings.js';
 

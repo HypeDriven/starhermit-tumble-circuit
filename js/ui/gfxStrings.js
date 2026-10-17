@@ -1,5 +1,5 @@
-// Localized strings for the Graphics settings section. The rest of the game
-// ships in English; this panel follows the browser language.
+// Localized strings for the Graphics settings section, in the game language
+// (app.js passes i18n.js locale()).
 
 const EN = {
   quality: 'Quality', auto: 'Auto (detected: {tier})', scale: 'Render scale',

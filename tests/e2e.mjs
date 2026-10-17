@@ -34,6 +34,7 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { launchToken, stubStarHermit } from './starhermit-e2e.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SHOT = (stage, vp) => `/tmp/tumble-circuit-e2e-${stage}-${vp}.png`;
@@ -193,8 +194,8 @@ async function runPass(browser, name, ctxOpts, { full }) {
     // start Learn → Lesson 1
     await startLesson1(page);
     const hud = await readHud(page);
-    // Lessons carry no `.name`, so the HUD titles them by id ("lesson-1").
-    if (hud.title !== 'lesson-1') throw new Error(`expected Lesson 1, got hud title "${hud.title}"`);
+    // The HUD titles a lesson by its (localized) lesson title.
+    if (hud.title !== 'Move Out') throw new Error(`expected Lesson 1 "Move Out", got hud title "${hud.title}"`);
     if (!/finish/i.test(hud.goal)) throw new Error(`unexpected lesson goal: "${hud.goal}"`);
     const banner = (await page.textContent('#lesson-banner')) || '';
     if (!/finish/i.test(banner)) throw new Error(`unexpected lesson intro banner: "${banner.slice(0, 60)}"`);
@@ -269,6 +270,104 @@ async function runPass(browser, name, ctxOpts, { full }) {
   console.log(`ok - ${name}: no page errors`);
 }
 
+// ---------- language + report pass (signed in, stubbed StarHermit API) ----------
+// Automatic follows the account's preferred language (fr-CA); choosing Italian
+// in Settings relabels it in place and PUTs ui.language; Report a problem posts
+// to /reports; a German lesson shows German HUD/banner text without overlaps;
+// switching back to Automatic from the pause menu re-renders the round's text
+// without restarting it.
+async function languagePass(browser, name, ctxOpts) {
+  const errors = [];
+  const context = await browser.newContext(ctxOpts);
+  const page = await context.newPage();
+  page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
+  page.on('console', (m) => {
+    if ((m.type() !== 'error' && m.type() !== 'warning') || browserNoise.test(m.text())) return;
+    errors.push(`console ${m.type()}: ${m.text()}`);
+  });
+  try {
+    const calls = await stubStarHermit(page, { preferredLanguage: 'fr-CA' });
+    await page.goto('about:blank');
+    await page.goto(BASE + '/index.html#game_token=' + launchToken(), { waitUntil: 'load' });
+    await page.waitForFunction(() => document.documentElement.lang === 'fr-CA', null, { timeout: 20000 });
+    await page.waitForFunction(() => document.querySelector('#screens [data-act="play"]')?.textContent.trim() === 'Jouer');
+    ok(`${name}: Automatic follows the account language (fr-CA)`);
+
+    await page.click('#screens [data-act="settings"]');
+    const choice = page.locator('#screens [data-game-language="choice"]');
+    await choice.scrollIntoViewIfNeeded();
+    const auto = (await choice.locator('option').first().textContent()).trim();
+    if (auto !== 'Automatique — Français (Canada)') throw new Error(`Automatic label not resolved: "${auto}"`);
+    if ((await page.locator('[data-game-language="choice"]').count()) !== 1) throw new Error('expected exactly one language selector');
+    await choice.selectOption('it-IT');
+    await page.waitForFunction(() => document.documentElement.lang === 'it-IT');
+    await page.waitForFunction(() => /Salvato/.test(document.querySelector('[data-game-language="status"]').textContent));
+    if (calls.settings['ui.language']?.choice !== 'it-IT') throw new Error('ui.language not saved: ' + JSON.stringify(calls.settings));
+    const rel = await page.evaluate(() => ({
+      title: document.getElementById('set-h').textContent,
+      quality: document.querySelector('#gfx-box label span').textContent,
+      rm: document.querySelector('[data-i18n="reducedMotion"]').textContent,
+      sameSelect: document.activeElement?.dataset?.gameLanguage === 'choice' || !!document.querySelector('[data-game-language="choice"]'),
+    }));
+    if (rel.title !== 'Impostazioni' || rel.quality !== 'Qualità' || rel.rm !== 'Movimento ridotto') throw new Error('Settings not re-rendered in Italian: ' + JSON.stringify(rel));
+    ok(`${name}: Italian chosen in Settings — relabelled in place, ui.language saved`);
+
+    await page.locator('[data-game-report="title"]').scrollIntoViewIfNeeded();
+    await page.fill('[data-game-report="title"]', 'Test report');
+    await page.click('[data-game-report="send"]');
+    await page.waitForFunction(() => /Grazie/.test(document.querySelector('[data-game-report="status"]').textContent));
+    if (!calls.reports?.[0] || calls.reports[0].kind !== 'bug') throw new Error('report not posted');
+    await page.screenshot({ path: SHOT('language', name) });
+    ok(`${name}: Report a problem posted to /reports`);
+
+    // German lesson round.
+    await choice.selectOption('de-DE');
+    await page.waitForFunction(() => document.documentElement.lang === 'de-DE');
+    await page.click('#screens [data-act="done"]');
+    await page.waitForFunction(() => document.querySelector('#screens [data-act="play"]')?.textContent.trim() === 'Spielen');
+    await page.screenshot({ path: SHOT('german-title', name) });
+    await startLesson1(page);
+    await page.waitForFunction(() => document.getElementById('hud-title').textContent === 'Los geht’s');
+    const banner = await page.textContent('#lesson-banner');
+    if (!/Himmelsarena/.test(banner)) throw new Error('lesson banner not German: ' + banner);
+    await page.waitForTimeout(3400); // countdown
+    const layout = await page.evaluate(() => {
+      const r = (id) => document.getElementById(id).getBoundingClientRect();
+      const hud = r('hud'), lb = r('lesson-banner');
+      const vis = (id) => !document.getElementById(id).classList.contains('hidden');
+      const cut = [...document.querySelectorAll('#hud *, #lesson-banner')].some((e) => { const b = e.getBoundingClientRect(); return b.width && (b.right > innerWidth + 1 || b.left < -1); });
+      const touch = vis('touch-ui') ? [r('btn-jump'), r('btn-dive')] : [];
+      const overlap = (a, b) => a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      const btnText = vis('touch-ui') && ['btn-jump', 'btn-dive'].some((id) => { const b = document.getElementById(id); return b.scrollWidth > b.clientWidth + 1 || b.getBoundingClientRect().right > innerWidth + 1; });
+      return { cut, btnText, bannerOverHud: vis('lesson-banner') && overlap(hud, lb), bannerOverButtons: touch.some((b) => overlap(b, lb)) };
+    });
+    if (layout.cut || layout.btnText || layout.bannerOverHud || layout.bannerOverButtons) throw new Error('German HUD layout problem: ' + JSON.stringify(layout));
+    await page.screenshot({ path: SHOT('german-play', name) });
+    const clockBefore = await page.textContent('#hud-clock');
+    ok(`${name}: German lesson shows German HUD and banner, nothing overlaps`);
+
+    // Back to Automatic mid-round from the pause menu.
+    await page.click('#btn-pause');
+    await page.waitForSelector('#screens [data-act="resume"]');
+    if ((await page.textContent('#pause-h')).trim() !== 'Pausiert') throw new Error('pause not German');
+    await page.click('#screens [data-act="settings"]');
+    await choice.scrollIntoViewIfNeeded();
+    await choice.selectOption('auto');
+    await page.waitForFunction(() => document.documentElement.lang === 'fr-CA');
+    await page.click('#screens [data-act="done"]');
+    await page.waitForFunction(() => document.getElementById('pause-h')?.textContent === 'En pause');
+    await page.click('#screens [data-act="resume"]');
+    await page.waitForFunction(() => document.getElementById('hud-title').textContent === 'En avant');
+    if (!/Leçon/.test(await page.textContent('#hud-goal'))) throw new Error('HUD goal not French');
+    const clockAfter = await page.textContent('#hud-clock');
+    if (clockAfter > clockBefore) throw new Error(`round restarted: clock ${clockBefore} → ${clockAfter}`);
+    ok(`${name}: Automatic mid-round re-renders HUD in French without restarting (${clockBefore} → ${clockAfter})`);
+  } finally {
+    await context.close();
+  }
+  if (errors.length) throw new Error(`${name} language pass had page errors:\n  ${errors.join('\n  ')}`);
+}
+
 // ---------- main ----------
 let browser = null;
 try {
@@ -280,6 +379,8 @@ try {
   await runPass(browser, 'desktop', { viewport: { width: 1280, height: 800 } }, { full: true });
   await runPass(browser, 'mobile',
     { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true }, { full: false });
+  await languagePass(browser, 'desktop', { viewport: { width: 1280, height: 800 } });
+  await languagePass(browser, 'mobile', { viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
   console.log('\nE2E PASS — tumble-circuit, desktop + mobile, no page errors');
 } catch (e) {
   failures++;

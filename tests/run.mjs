@@ -382,23 +382,29 @@ section('scoring tie-breaks');
 } // end !validateOnly
 
 // ---------------------------------------------------------------------------
-section('save migration + checksum + conflict resolution');
+section('save migration + checksum + conflict merge');
 {
-  const { migrateSave, resolveCloudConflict, SAVE_VERSION } = await import('../js/platform/store.js');
+  const { migrateSave, mergeSaves, SAVE_VERSION } = await import('../js/platform/store.js');
   const fresh = migrateSave(null);
   ok(fresh.version === SAVE_VERSION && fresh.settings.quality === 'auto', 'fresh save has defaults');
   const old = { version: 0, settings: { music: 0.3 }, journey: { unlocked: 5, passed: { j01: 900 } } };
   const m = migrateSave(old);
   ok(m.version === SAVE_VERSION && m.settings.music === 0.3 && m.settings.effects === 0.9 &&
     m.journey.unlocked === 5 && m.journey.passed.j01 === 900, 'v0 save migrated, overrides kept, defaults filled');
-  const sup = migrateSave({ journey: { unlocked: 6, passed: { j01: 900, j02: 800 } }, lessonsDone: {}, challengesDone: {} });
-  const sub = migrateSave({ journey: { unlocked: 5, passed: { j01: 900 } }, lessonsDone: {}, challengesDone: {} });
-  ok(resolveCloudConflict(sup, sub) === 'local', 'strict descendant wins locally');
-  ok(resolveCloudConflict(sub, sup) === 'remote', 'strict descendant wins remotely');
-  const a = migrateSave({ journey: { unlocked: 5, passed: { j01: 1 } } });
-  const b = migrateSave({ journey: { unlocked: 5, passed: { j02: 1 } } });
-  ok(resolveCloudConflict(a, b).startsWith('conflict'), 'diverged saves conflict');
-  ok(resolveCloudConflict({ ...sup, updatedAt: 1 }, { ...sub, daily: { d: 5 }, updatedAt: 2 }) === 'remote', 'newer remote updatedAt wins over local progression superset');
+  const remote = { journey: { unlocked: 6, passed: { j01: 700, j05: 800 }, crowns: { j08: true } }, lessonsDone: { 'lesson-1': true },
+    challengesDone: { 'chal-speed': true }, daily: { '2026-10-01': 500 }, achievements: { first_finish: 10 },
+    stats: { races: 9, finishes: 4, qualifies: 2, showsWon: 0, bestStreak: 1 }, settings: { music: 0.1 }, updatedAt: 2 };
+  const local = { journey: { unlocked: 3, passed: { j01: 950, j02: 600 }, crowns: {} }, lessonsDone: { 'lesson-2': true },
+    challengesDone: {}, daily: { '2026-10-01': 650, '2026-10-02': 300 }, achievements: { first_finish: 5, streak_3: 7 },
+    stats: { races: 3, finishes: 3, qualifies: 3, showsWon: 1, bestStreak: 3 }, settings: { music: 0.9 }, updatedAt: 1 };
+  const g = mergeSaves(remote, local);
+  ok(g.journey.unlocked === 6 && g.journey.passed.j01 === 950 && g.journey.passed.j02 === 600 && g.journey.passed.j05 === 800 && g.journey.crowns.j08,
+    'journey: higher unlock, better score per stage, union of passes and crowns');
+  ok(g.lessonsDone['lesson-1'] && g.lessonsDone['lesson-2'] && g.challengesDone['chal-speed'], 'lessons and challenges unioned');
+  ok(g.daily['2026-10-01'] === 650 && g.daily['2026-10-02'] === 300, 'daily: better total per day');
+  ok(g.achievements.first_finish === 5 && g.achievements.streak_3 === 7, 'achievements unioned, earliest unlock kept');
+  ok(g.stats.races === 9 && g.stats.qualifies === 3 && g.stats.showsWon === 1 && g.stats.bestStreak === 3, 'stats: larger value each');
+  ok(g.settings.music === 0.1 && g.updatedAt === 2, 'settings from the newer side');
 }
 
 section('platform cloud-save codec (canonical SDK zip)');

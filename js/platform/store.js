@@ -84,27 +84,36 @@ export function persistSave(doc) {
   return out;
 }
 
-// Conflict resolution helper: when both documents carry updatedAt (stamped on
-// every game write) the strictly newer local doc returns 'local' and anything
-// else 'remote', so dailies/challenges/stats played on another device are not
-// reverted. Legacy docs without it fall back to progression: 'local' when the
-// local doc strictly descends from remote (superset of progression), 'remote'
-// likewise (and on ties), or a 'conflict-*' verdict when neither does. The
-// cloud loader (js/main.js) mirrors a 'local' win upward and otherwise keeps
-// the remote copy, per the platform's remote-preferred conflict policy.
-export function resolveCloudConflict(local, remote) {
-  if (typeof local.updatedAt === 'number' && typeof remote.updatedAt === 'number') {
-    return local.updatedAt > remote.updatedAt ? 'local' : 'remote';
-  }
-  const score = (d) => Object.keys(d.journey.passed || {}).length +
-    Object.keys(d.lessonsDone || {}).length + Object.keys(d.challengesDone || {}).length +
-    Object.keys(d.achievements || {}).length;
-  const covers = (a, b) => {
-    for (const k of Object.keys(b.journey.passed || {})) if (!a.journey.passed[k]) return false;
-    for (const k of Object.keys(b.lessonsDone || {})) if (!a.lessonsDone[k]) return false;
-    return true;
+// Merge two save documents without dropping either side's progress (boot load
+// and after a refused conditional cloud write): journey — the higher unlock,
+// passed stages with the better score, crowns; unions of lessons, challenges
+// and achievements (earliest unlock); per daily the better total; each stat
+// the larger value. Settings come from the more recently written side.
+export function mergeSaves(remote, local) {
+  const r = migrateSave(remote), l = migrateSave(local);
+  const ru = typeof remote?.updatedAt === 'number' ? remote.updatedAt : 0;
+  const lu = typeof local?.updatedAt === 'number' ? local.updatedAt : 0;
+  const out = migrateSave({ ...l, settings: { ...(ru > lu ? r.settings : l.settings) } });
+  const maxMap = (a, b) => {
+    const m = { ...a };
+    for (const [k, v] of Object.entries(b || {})) m[k] = k in m ? (typeof v === 'number' && typeof m[k] === 'number' ? Math.max(m[k], v) : (m[k] || v)) : v;
+    return m;
   };
-  if (covers(remote, local)) return 'remote';
-  if (covers(local, remote)) return 'local';
-  return score(local) >= score(remote) ? 'conflict-local-newer' : 'conflict-remote-newer';
+  const minMap = (a, b) => {
+    const m = { ...a };
+    for (const [k, v] of Object.entries(b || {})) m[k] = k in m && typeof m[k] === 'number' && typeof v === 'number' ? Math.min(m[k], v) : (m[k] ?? v);
+    return m;
+  };
+  out.journey = {
+    unlocked: Math.max(r.journey.unlocked || 1, l.journey.unlocked || 1),
+    passed: maxMap(r.journey.passed, l.journey.passed),
+    crowns: maxMap(r.journey.crowns, l.journey.crowns),
+  };
+  out.lessonsDone = maxMap(r.lessonsDone, l.lessonsDone);
+  out.challengesDone = maxMap(r.challengesDone, l.challengesDone);
+  out.daily = maxMap(r.daily, l.daily);
+  out.achievements = minMap(r.achievements, l.achievements);
+  out.stats = maxMap(r.stats, l.stats);
+  out.updatedAt = Math.max(ru, lu);
+  return out;
 }

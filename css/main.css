@@ -122,6 +122,8 @@ button:disabled { opacity: 0.45; cursor: default; }
 }
 .touch-btn {
   width: 84px; height: 84px; border-radius: 50%; font-weight: 700;
+  /* translated labels (Springen, Mergulhar…) must fit inside the circle */
+  padding: 0 4px; font-size: 0.8rem; line-height: 1.1; overflow-wrap: anywhere; hyphens: auto;
   background: rgba(255, 209, 102, 0.25); border-color: var(--accent);
 }
 #btn-dive { background: rgba(239, 71, 111, 0.25); border-color: var(--danger); }

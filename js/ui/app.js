@@ -13,10 +13,12 @@ import { utcDateString, msUntilNextUtcDay } from '../platform/timeSync.js';
 import { PRESETS, CATEGORIES, presetTier, choosePreset } from '../render/gfx.js';
 import { gfxStrings } from './gfxStrings.js';
 import { platformStrings } from './platformStrings.js';
+import { t, tn, locale, onLanguage, applyDom, courseName, themeName, mechanicName, lessonText, playerName } from './i18n.js';
 
 const $ = (sel) => document.querySelector(sel);
 const el = (id) => document.getElementById(id);
 
+// English names/descriptions; the shown text comes from strings.js (achievements group).
 export const ACHIEVEMENTS = {
   first_finish: { name: 'First Crossing', desc: 'Finish your first course.' },
   lesson_grad: { name: 'Graduate', desc: 'Complete all five lessons.' },
@@ -62,7 +64,7 @@ export class App {
     this.show = null;
     this.keys = {};          // action -> held
     this.setBindings(DEFAULT_BINDINGS);
-    this.pt = platformStrings(navigator.language);
+    this.pt = platformStrings(locale());
     this.touch = { active: false, mx: 0, mz: 0, jump: false, dive: false };
     this.lastFocus = null;
     this.frame = this.frame.bind(this);
@@ -71,7 +73,8 @@ export class App {
     this.captionTimer = null;
     this.showFps = false;
     this.fps = 60;
-    audio.onCaption = (t) => this.showCaption(t);
+    audio.onCaption = (key) => this.showCaption(t(key));
+    this.redraw = null;   // re-renders the current menu screen in a new language
   }
 
   get settings() { return this.store.save.settings; }
@@ -82,6 +85,7 @@ export class App {
   start() {
     this.bindInput();
     this.applySettings();
+    onLanguage(() => this.relocalize());
     if (this.platform) {
       this.platform.onStatus = () => this.renderAccountLine();
       this.platform.onAuthChange = () => {
@@ -106,7 +110,7 @@ export class App {
       if (lessonEv) evs.push(lessonEv);
       for (const e of evs) this.handleRoundEvent(e);
       if (this.round.invalidFlash) {
-        this.announceText(this.round.invalidFlash, true);
+        this.announceText(t(INVALID_KEYS[this.round.invalidFlash] || 'capInvalid'), true);
         this.audio.event({ t: 'invalid' });
         this.round.invalidFlash = null;
       }
@@ -257,6 +261,10 @@ export class App {
   startRound(def, opts = {}) {
     const botCount = opts.bots != null ? opts.bots : 7;
     const roster = opts.roster || buildRoster(this.profileName(), PALETTE[0], botCount, def.seed % 23);
+    this.roundDef = def;
+    this.roundGoal = opts.goalText || null;   // thunk → string (re-read on a language change)
+    this.lessonBanner = false;
+    this.youDefault = !(this.platform && this.platform.nickname) && !opts.roster;
     this.round = new LocalRound(def, roster, {
       quota: opts.quota != null ? opts.quota : Math.max(1, Math.ceil((botCount + 1) / 2)),
       botSkill: opts.botSkill != null ? opts.botSkill : 0.55,
@@ -275,15 +283,53 @@ export class App {
     el('hud').classList.remove('hidden');
     el('countdown').classList.remove('hidden');
     if ('ontouchstart' in window) el('touch-ui').classList.remove('hidden');
-    if (opts.lesson) {
-      el('lesson-banner').classList.remove('hidden');
-      el('lesson-banner').textContent = opts.lesson.intro;
-    }
-    el('hud-title').textContent = def.name || def.id;
-    el('hud-goal').textContent = opts.goalText || (def.kind === 'survival' ? 'Survive — be the last tumbler standing' : `Reach the finish — top ${this.round.state.quota} qualify`);
-    el('hud-quota').textContent = def.kind === 'survival' ? '' : `Cutoff: top ${this.round.state.quota} of ${roster.length}`;
-    this.announceText(`${def.name || 'Round'} starting. ${el('hud-goal').textContent}`);
+    if (opts.lesson) el('lesson-banner').classList.remove('hidden');
+    this.renderRoundText();
+    this.announceText(t('roundStarting', { name: courseName(def) || t('round'), goal: el('hud-goal').textContent }));
     this.persistStats();
+  }
+
+  /** HUD title/goal/cutoff and the lesson banner in the current language. */
+  renderRoundText() {
+    const r = this.round, def = this.roundDef;
+    if (!r || !def) return;
+    el('hud-title').textContent = courseName(def);
+    if (this.hostedRound) { el('hud-goal').textContent = t('hostedGoal'); return; }
+    el('hud-goal').textContent = this.roundGoal ? this.roundGoal()
+      : def.kind === 'survival' ? t('goalSurvive') : t('goalReach', { n: r.state.quota });
+    el('hud-quota').textContent = def.kind === 'survival' ? '' : t('cutoff', { n: r.state.quota, total: r.state.players.length });
+    if (r.lesson) {
+      // The intro shows until the first lesson-step event, then the current step.
+      const st = r.currentLessonStep();
+      el('lesson-banner').textContent = !this.lessonBanner ? lessonText(r.lesson.id, r.lesson.intro)
+        : st ? this.lessonText(r.lesson, st) : t('lessonComplete');
+    }
+  }
+
+  /**
+   * The game language changed (Settings → Language, or the account preference
+   * arrived): static markup is re-applied; re-render what this class built —
+   * the current menu screen (Settings relabels in place so the shared panel
+   * and its Language select stay mounted), HUD, banner, captions targets —
+   * without touching the round or the dev-server socket.
+   */
+  relocalize() {
+    this.pt = platformStrings(locale());
+    const you = this.round && this.round.state.players.find((p) => p.id === 'you');
+    if (you && this.youDefault) {
+      you.name = t('you');
+      this.scene.setPlayerName && this.scene.setPlayerName(you.id, you.name, you.color);
+      const sr = this.show && this.show.roster.find((r) => r.id === 'you');
+      if (sr) sr.name = you.name;
+    }
+    this.renderRoundText();
+    if (this.round) this.updateHUD();
+    if (el('set-h') || el('host-h')) {
+      applyDom(el('screens'));
+      this.renderGraphicsSection();
+    } else if (this.redraw && el('screens').firstElementChild) {
+      this.redraw();
+    }
   }
 
   endRoundTo(screenFn) {
@@ -336,28 +382,29 @@ export class App {
     // audio + vfx tiers: input ack < legal move < goal < round completion
     switch (e.t) {
       case 'countdown': el('countdown').textContent = e.n; this.audio.event({ t: 'countdown' }); break;
-      case 'go': el('countdown').textContent = 'GO!'; this.audio.event({ t: 'go' }); setTimeout(() => el('countdown').classList.add('hidden'), 700); break;
+      case 'go': el('countdown').textContent = t('go'); this.audio.event({ t: 'go' }); setTimeout(() => el('countdown').classList.add('hidden'), 700); break;
       case 'lesson-step': {
         const st = this.round.currentLessonStep();
-        el('lesson-banner').textContent = st ? this.lessonText(st.text) : 'Lesson complete — reach the finish!';
+        this.lessonBanner = true;
+        el('lesson-banner').textContent = st ? this.lessonText(this.round.lesson, st) : t('lessonComplete');
         this.audio.event({ t: 'checkpoint' });
-        this.announceText(st ? this.lessonText(st.text) : 'Lesson complete');
+        this.announceText(st ? this.lessonText(this.round.lesson, st) : t('lessonCompleteShort'));
         break;
       }
       default:
         this.audio.event(e, this.round.state.tick + (e.p === this.round.localId ? 7 : 1));
         this.scene.onEvent(e, this.round.localId);
-        if (e.t === 'checkpoint' && e.p === this.round.localId) this.announceText(`Checkpoint ${e.cp} of ${e.of}`);
-        if (e.t === 'finish' && e.p === this.round.localId) this.announceText(`Finished! Place ${e.place}`);
-        if (e.t === 'out' && e.p === this.round.localId) this.announceText('You are out', true);
+        if (e.t === 'checkpoint' && e.p === this.round.localId) this.announceText(t('checkpointOf', { cp: e.cp, of: e.of }));
+        if (e.t === 'finish' && e.p === this.round.localId) this.announceText(t('finishedPlace', { place: e.place }));
+        if (e.t === 'out' && e.p === this.round.localId) this.announceText(t('youAreOut'), true);
     }
   }
 
-  lessonText(text) {
-    return text
-      .replace('{move}', 'W A S D / arrows / stick')
-      .replace('{jump}', 'Space / Jump button')
-      .replace('{dive}', 'Shift / Dive button');
+  lessonText(lesson, step) {
+    return lessonText(lesson.id + '.' + step.id, step.text)
+      .replace('{move}', t('moveKeys'))
+      .replace('{jump}', t('jumpKeys'))
+      .replace('{dive}', t('diveKeys'));
   }
 
   updateHUD() {
@@ -369,7 +416,7 @@ export class App {
     if (me) {
       const ranked = rankPlayers(s);
       const place = ranked.findIndex(p => p.id === me.id) + 1;
-      el('hud-place').textContent = me.st === PSTATE.FINISH ? `Finished #${me.finishTick >= 0 ? s.finishOrder.indexOf(me.id) + 1 : '—'}` : `#${place} of ${s.players.length}`;
+      el('hud-place').textContent = me.st === PSTATE.FINISH ? t('finishedN', { n: me.finishTick >= 0 ? s.finishOrder.indexOf(me.id) + 1 : '—' }) : t('placeOf', { place, total: s.players.length });
       const prog = s.kind === 'race' ? Math.min(100, (me.progress / s.course.finishZ) * 100) : Math.min(100, (me.aliveTicks / s.timeLimit) * 100);
       const bar = el('hud-progress');
       el('hud-progress-fill').style.width = prog.toFixed(1) + '%';
@@ -411,7 +458,7 @@ export class App {
       if (!save.achievements[key]) {
         save.achievements[key] = Date.now();
         this.audio.event({ t: 'achievement' });
-        this.announceText(`Achievement unlocked: ${ACHIEVEMENTS[key].name}`, true);
+        this.announceText(t('achievementUnlocked', { name: tn('achievements', key, [ACHIEVEMENTS[key].name])[0] }), true);
       }
     };
     save.stats.races++;
@@ -427,44 +474,50 @@ export class App {
       if (this.streak >= 3) unlock('streak_3');
     } else this.streak = 0;
 
+    // Headline and next-action label are thunks so the results screen re-renders in a new language.
     let headline, nextAction = null;
     if (r.lesson) {
       const done = r.lessonDone();
-      headline = done ? `${r.lesson.title} — complete!` : `${r.lesson.title} — keep practicing`;
+      const lesson = r.lesson;
+      headline = () => t(done ? 'lessonDoneH' : 'lessonKeepH', { lesson: tn('lessons', lesson.id, lesson.title) });
       if (done) {
         save.lessonsDone[r.lesson.id] = true;
         if (LESSONS.every(l => save.lessonsDone[l.id])) unlock('lesson_grad');
         const idx = LESSONS.indexOf(r.lesson);
-        if (idx < LESSONS.length - 1) nextAction = { label: 'Next lesson', fn: () => this.startLesson(idx + 1) };
+        if (idx < LESSONS.length - 1) nextAction = { label: () => t('nextLesson'), fn: () => this.startLesson(idx + 1) };
       }
     } else if (this.challengeCtx) {
       const out = r.challengeOutcome();
-      headline = out.won ? `${this.challengeCtx.name} — cleared!` : `${this.challengeCtx.name} — ${out.desc}`;
+      const ch = this.challengeCtx;
+      headline = () => (out.won ? t('challengeCleared', { name: tn('challenges', ch.id, ch.name) })
+        : t('challengeOutcome', { name: tn('challenges', ch.id, ch.name), desc: outcomeText(out) }));
       if (out.won) save.challengesDone[this.challengeCtx.id] = true;
-      nextAction = { label: 'Challenges', fn: () => this.showChallenges() };
+      nextAction = { label: () => t('challengesH'), fn: () => this.showChallenges() };
     } else if (this.dailyCtx) {
-      headline = me.qualified ? 'Daily challenge — qualified!' : 'Daily challenge — eliminated';
+      headline = () => (me.qualified ? t('dailyQualified') : t('dailyEliminated'));
       const d = utcDateString();
       if (!save.daily[d] || me.total > save.daily[d]) save.daily[d] = me.total;
       if (Object.keys(save.daily).length >= 5) unlock('daily_regular');
-      nextAction = { label: 'Back to title', fn: () => this.showTitle() };
+      nextAction = { label: () => t('backToTitle'), fn: () => this.showTitle() };
     } else if (this.journeyCtx) {
       const n = this.journeyCtx.stage;
+      const st = this.journeyCtx;
       const passed = me.place <= (this.journeyCtx.passPlace || 4) && me.finished;
-      headline = passed ? `${this.journeyCtx.name} — passed! (#${me.place})` : `${this.journeyCtx.name} — #${me.place}, needed top ${this.journeyCtx.passPlace}`;
+      headline = () => (passed ? t('stagePassed', { name: courseName(st), place: me.place })
+        : t('stageFailed', { name: courseName(st), place: me.place, n: st.passPlace }));
       if (passed) {
         save.journey.passed['j' + String(n).padStart(2, '0')] = me.total;
         save.journey.unlocked = Math.max(save.journey.unlocked, Math.min(40, n + 1));
         if (this.journeyCtx.mastery) { save.journey.crowns['j' + String(n).padStart(2, '0')] = true; unlock('mastery_crown'); }
         if (Object.keys(save.journey.passed).length >= 20) unlock('halfway');
-        if (n < 40) nextAction = { label: `Stage ${n + 1}`, fn: () => this.startJourneyStage(n + 1) };
+        if (n < 40) nextAction = { label: () => t('stageN', { n: n + 1 }), fn: () => this.startJourneyStage(n + 1) };
       } else {
-        nextAction = { label: 'Retry', fn: () => this.startJourneyStage(n) };
+        nextAction = { label: () => t('retry'), fn: () => this.startJourneyStage(n) };
       }
     } else if (this.showCtx) {
-      headline = me.qualified ? 'Qualified!' : 'Eliminated';
+      headline = () => (me.qualified ? t('qualified') : t('eliminated'));
     } else {
-      headline = me.finished ? `Finished #${me.place}` : `Placed #${me.place}`;
+      headline = () => (me.finished ? t('finishedN', { n: me.place }) : t('placedN', { n: me.place }));
     }
 
     this.store.persist();
@@ -478,47 +531,50 @@ export class App {
     this.lbText = null;
     const token = this.lbToken = {};
     if (!this.platform || !this.platform.active || this.round.lesson || this.hostedRound) return;
-    this.lbText = this.pt('lbPosting');
+    this.lbText = () => this.pt('lbPosting');
     this.platform.submitScore(Math.max(0, total)).then((r) => {
       if (token !== this.lbToken) return;
-      this.lbText = !r.posted ? this.pt('lbFailed') : r.rank ? this.pt('lbRank', { rank: r.rank }) : this.pt('lbPosted');
+      this.lbText = () => (!r.posted ? this.pt('lbFailed') : r.rank ? this.pt('lbRank', { rank: r.rank }) : this.pt('lbPosted'));
       const el = document.getElementById('results-lb');
-      if (el) el.textContent = this.lbText;
+      if (el) el.textContent = this.lbText();
     });
   }
 
-  showResultsScreen({ headline, res, me, breakdown, nextAction }) {
+  showResultsScreen(spec) {
+    const { headline, res, me, breakdown, nextAction } = spec;
+    this.redraw = () => this.showResultsScreen(spec);
     const rows = res.places.map((id) => {
       const r = res.results[id];
       const p = this.round.state.players.find(pl => pl.id === id);
       return `<tr class="${id === this.round.localId ? 'you' : ''} ${r.qualified ? 'qual' : ''}">
-        <td>${r.place}. ${esc(p ? p.name : id)}</td>
-        <td>${r.finished ? formatTicks(r.finishTick) : (this.round.state.kind === 'survival' ? formatTicks(r.aliveTicks) + ' alive' : 'DNF')}</td>
+        <td>${r.place}. ${esc(p ? playerName(p.name) : id)}</td>
+        <td>${r.finished ? formatTicks(r.finishTick) : (this.round.state.kind === 'survival' ? esc(t('alive', { time: formatTicks(r.aliveTicks) })) : esc(t('dnf')))}</td>
         <td>${r.total}</td></tr>`;
     }).join('');
-    const replayCheck = this.round.verifyReplay();
+    const replayCheck = spec.replayCheck || (spec.replayCheck = this.round.verifyReplay());
+    const row = (key, v) => `<tr><td>${esc(t(key))}</td><td>${v}</td></tr>`;
     this.overlay(`
       <div class="panel" role="dialog" aria-labelledby="res-h">
-        <h1 id="res-h">${esc(headline)}</h1>
-        <h2>Score breakdown</h2>
-        <table class="score" aria-label="Your score components">
-          <tr><td>Checkpoints</td><td>${breakdown.checkpoints}</td></tr>
-          <tr><td>Placement</td><td>${breakdown.placement}</td></tr>
-          <tr><td>Qualification bonus</td><td>${breakdown.qualify}</td></tr>
-          <tr><td>Time bonus</td><td>${breakdown.timeBonus}</td></tr>
-          <tr><td>Survival</td><td>${breakdown.survival}</td></tr>
-          <tr><td>Falls penalty</td><td>${breakdown.falls}</td></tr>
-          <tr><th>Total</th><th>${me.total}</th></tr>
+        <h1 id="res-h">${esc(headline())}</h1>
+        <h2>${esc(t('scoreBreakdown'))}</h2>
+        <table class="score" aria-label="${esc(t('ariaScoreComponents'))}">
+          ${row('checkpoints', breakdown.checkpoints)}
+          ${row('placement', breakdown.placement)}
+          ${row('qualifyBonus', breakdown.qualify)}
+          ${row('timeBonus', breakdown.timeBonus)}
+          ${row('survival', breakdown.survival)}
+          ${row('fallsPenalty', breakdown.falls)}
+          <tr><th>${esc(t('total'))}</th><th>${me.total}</th></tr>
         </table>
-        <h2>Standings</h2>
-        <table class="score" aria-label="Round standings"><tr><th>Player</th><th>Result</th><th>Score</th></tr>${rows}</table>
-        ${this.lbText != null ? `<p id="results-lb" aria-live="polite">${esc(this.lbText)}</p>` : ''}
-        <p class="small muted">Replay integrity: ${replayCheck.ok ? 'verified deterministic' : 'mismatch (' + replayCheck.reason + ')'} · seed ${this.round.def.seed}</p>
+        <h2>${esc(t('standings'))}</h2>
+        <table class="score" aria-label="${esc(t('ariaStandings'))}"><tr><th>${esc(t('colPlayer'))}</th><th>${esc(t('colResult'))}</th><th>${esc(t('colScore'))}</th></tr>${rows}</table>
+        ${this.lbText != null ? `<p id="results-lb" aria-live="polite">${esc(this.lbText())}</p>` : ''}
+        <p class="small muted">${esc(replayCheck.ok ? t('replayOk', { seed: this.round.def.seed }) : t('replayBad', { reason: replayCheck.reason, seed: this.round.def.seed }))}</p>
         <div class="row mt">
-          ${nextAction ? `<button class="primary" data-act="next">${esc(nextAction.label)}</button>` : ''}
-          <button data-act="retry">Retry</button>
-          ${this.showCtx ? '<button data-act="continue-show">Continue show</button>' : ''}
-          <button data-act="menu">Mode select</button>
+          ${nextAction ? `<button class="primary" data-act="next">${esc(nextAction.label())}</button>` : ''}
+          <button data-act="retry">${esc(t('retry'))}</button>
+          ${this.showCtx ? `<button data-act="continue-show">${esc(t('continueShow'))}</button>` : ''}
+          <button data-act="menu">${esc(t('modeSelect'))}</button>
         </div>
       </div>`);
     this.onAction('next', () => nextAction && nextAction.fn());
@@ -543,7 +599,7 @@ export class App {
       lesson, bots: lesson.bots ? lesson.bots.count : 0, botSkill: lesson.bots ? lesson.bots.skill : 0.2,
       quota: lesson.passPlace || 1,
       // the banner carries the instruction; the HUD keeps a short goal line
-      goalText: `Lesson: ${lesson.title} — reach the finish gate`,
+      goalText: () => t('goalLesson', { title: tn('lessons', lesson.id, lesson.title) }),
     });
   }
 
@@ -554,19 +610,19 @@ export class App {
     this.lastRoundCtx = () => this.startJourneyStage(n);
     this.startRound(st, {
       bots: st.bots.count, botSkill: st.bots.skill, quota: st.passPlace,
-      goalText: `${st.name} — finish in the top ${st.passPlace} to pass${st.mastery ? ' · mastery stage' : ''}`,
+      goalText: () => t('goalStage', { name: courseName(st), n: st.passPlace }) + (st.mastery ? t('masteryStage') : ''),
     });
   }
 
   startDaily() {
     const d = utcDateString();
-    if (isDailyExcluded(d)) { this.announceText('Today\'s daily is excluded from ranking', true); return; }
+    if (isDailyExcluded(d)) { this.announceText(t('dailyExcluded'), true); return; }
     const def = dailyDef(d);
     this.dailyCtx = { date: d }; this.journeyCtx = null; this.challengeCtx = null; this.showCtx = null;
     this.lastRoundCtx = () => this.startDaily();
     this.startRound(def, {
       bots: 9, botSkill: 0.6, quota: 4,
-      goalText: `Daily ${d} — shared seed ${def.seed}, ruleset v${DAILY_RULESET}. One course for everyone today.`,
+      goalText: () => t('goalDaily', { date: d, seed: def.seed, v: DAILY_RULESET }),
     });
   }
 
@@ -576,7 +632,7 @@ export class App {
     this.lastRoundCtx = () => this.startPractice(courseId, skill, bots);
     this.startRound(def, {
       bots, botSkill: skill, quota: Math.max(1, Math.ceil((bots + 1) / 2)),
-      goalText: 'Practice — unranked, restart freely',
+      goalText: () => t('goalPractice'),
     });
   }
 
@@ -589,7 +645,7 @@ export class App {
     this.startRound(def, {
       bots: ch.bots ? ch.bots.count : 0, botSkill: ch.bots ? ch.bots.skill : 0.4,
       quota: ch.goal.kind === 'win' ? 1 : 1,
-      mods: ch.mods, goal: ch.goal, goalText: ch.desc,
+      mods: ch.mods, goal: ch.goal, goalText: () => tn('challengeDesc', ch.id, ch.desc),
     });
   }
 
@@ -599,6 +655,7 @@ export class App {
     this.showCtx = def; this.journeyCtx = null; this.challengeCtx = null; this.dailyCtx = null;
     const roster = buildRoster(this.profileName(), PALETTE[0], def.players - 1, 7);
     this.show = createShow(def, roster);
+    this.showYouDefault = !(this.platform && this.platform.nickname);
     this.playShowRound();
   }
 
@@ -606,13 +663,16 @@ export class App {
     const round = currentRound(this.show);
     const courseDef = courseById(round.courseId);
     const aliveRoster = this.show.roster.filter(r => this.show.aliveIds.includes(r.id));
+    const youDefault = this.showYouDefault;
     this.lastRoundCtx = () => this.playShowRound();
+    const showDef = this.showCtx, n = this.show.roundIndex + 1, final = isFinalRound(this.show);
     // survival final: only the last tumbler qualifies
     this.startRound(courseDef, {
       quota: Math.min(round.quota, aliveRoster.length), botSkill: this.showCtx.botSkill,
       roster: aliveRoster,
-      goalText: `${this.showCtx.name} — round ${this.show.roundIndex + 1}/${this.showCtx.rounds.length}: ${isFinalRound(this.show) ? 'FINAL — winner takes the crown' : `top ${round.quota} qualify`}`,
+      goalText: () => t(final ? 'goalShowFinal' : 'goalShowRound', { show: tn('shows', showDef.id, showDef.name), n, total: showDef.rounds.length, quota: round.quota }),
     });
+    this.youDefault = youDefault;
   }
 
   continueShow() {
@@ -632,20 +692,25 @@ export class App {
         this.audio.event({ t: 'champion' });
       }
       this.store.persist();
-      const rowsHtml = table.map(r => `<tr class="${r.id === 'you' ? 'you' : ''}">
-        <td>${r.champion ? '👑 ' : ''}${esc(r.name)}</td><td>${r.points}</td><td>${r.rounds.join(', ') || '—'}</td></tr>`).join('');
-      this.overlay(`
-        <div class="panel" role="dialog" aria-labelledby="show-h">
-          <h1 id="show-h">${champ ? 'You are the champion!' : eliminated ? 'Eliminated — show over' : esc(this.showCtx.name) + ' — show over'}</h1>
-          <p class="muted">You placed #${you ? table.indexOf(you) + 1 : '—'} with ${you ? you.points : 0} points.</p>
-          <table class="score"><tr><th>Player</th><th>Points</th><th>Rounds</th></tr>${rowsHtml}</table>
-          <div class="row mt">
-            <button class="primary" data-act="menu">Mode select</button>
-            <button data-act="title">Title</button>
-          </div>
-        </div>`);
-      this.onAction('menu', () => this.endRoundTo(() => this.showModes()));
-      this.onAction('title', () => this.endRoundTo(() => this.showTitle()));
+      const showDef = this.showCtx;
+      const draw = () => {
+        const rowsHtml = table.map(r => `<tr class="${r.id === 'you' ? 'you' : ''}">
+          <td>${r.champion ? '👑 ' : ''}${esc(playerName(r.name))}</td><td>${r.points}</td><td>${r.rounds.join(', ') || '—'}</td></tr>`).join('');
+        this.overlay(`
+          <div class="panel" role="dialog" aria-labelledby="show-h">
+            <h1 id="show-h">${esc(champ ? t('champion') : eliminated ? t('eliminatedShowOver') : t('showOver', { show: tn('shows', showDef.id, showDef.name) }))}</h1>
+            <p class="muted">${esc(t('showPlaced', { place: you ? table.indexOf(you) + 1 : '—', points: you ? you.points : 0 }))}</p>
+            <table class="score"><tr><th>${esc(t('colPlayer'))}</th><th>${esc(t('colPoints'))}</th><th>${esc(t('colRounds'))}</th></tr>${rowsHtml}</table>
+            <div class="row mt">
+              <button class="primary" data-act="menu">${esc(t('modeSelect'))}</button>
+              <button data-act="title">${esc(t('titleBtn'))}</button>
+            </div>
+          </div>`);
+        this.onAction('menu', () => this.endRoundTo(() => this.showModes()));
+        this.onAction('title', () => this.endRoundTo(() => this.showTitle()));
+      };
+      this.redraw = draw;
+      draw();
       this.round = null;
       el('hud').classList.add('hidden');
       el('touch-ui').classList.add('hidden');
@@ -672,6 +737,7 @@ export class App {
 
   showTitle() {
     this.endlessCleanup();
+    this.redraw = () => this.showTitle();
     const save = this.store.save;
     const journeyDone = Object.keys(save.journey.passed).length;
     const d = utcDateString();
@@ -679,23 +745,23 @@ export class App {
     this.overlay(`
       <div class="panel transparent-panel center" role="dialog" aria-labelledby="title-h">
         <h1 class="title-logo" id="title-h">Tumble <em>Circuit</em></h1>
-        <p class="title-sub">Race the sky. Survive the spin. Take the crown.</p>
+        <p class="title-sub">${esc(t('tagline'))}</p>
         <p class="small muted" id="account-line" role="status"></p>
         <div class="col mt">
-          <button class="primary" data-act="play">Play</button>
+          <button class="primary" data-act="play">${esc(t('play'))}</button>
           <div class="row" style="justify-content:center">
-            <button data-act="daily">Daily challenge${dailyBest ? ` · best ${dailyBest}` : ''}</button>
-            <button data-act="journey">Journey (${journeyDone}/40)</button>
-            <button data-act="learn">Learn</button>
+            <button data-act="daily">${esc(dailyBest ? t('dailyBest', { n: dailyBest }) : t('dailyChallenge'))}</button>
+            <button data-act="journey">${esc(t('journeyN', { n: journeyDone }))}</button>
+            <button data-act="learn">${esc(t('learn'))}</button>
           </div>
           <div class="row" style="justify-content:center">
-            <button data-act="settings">Settings</button>
-            <button data-act="help">Help</button>
+            <button data-act="settings">${esc(t('settings'))}</button>
+            <button data-act="help">${esc(t('help'))}</button>
             ${this.platform && this.platform.canSignIn() ? `<button data-act="signin" id="btn-signin">${esc(this.pt('signIn'))}</button>` : ''}
             ${this.platform && this.platform.active && this.platform.inviteLink() ? `<button data-act="invite" id="btn-invite">${esc(this.pt('invite'))}</button>` : ''}
           </div>
         </div>
-        <p class="small muted mt">${'ontouchstart' in window ? 'Drag the stick (bottom-left) to move · Jump and Dive buttons (bottom-right)' : `${esc(this.keysFor('forward', 'left', 'back', 'right'))} move · ${esc(this.keysFor('jump'))} jump · ${esc(this.keysFor('dive'))} dive · ${esc(this.keysFor('pause'))} pause`}</p>
+        <p class="small muted mt">${esc('ontouchstart' in window ? t('touchHint') : t('keysHint', { move: this.keysFor('forward', 'left', 'back', 'right'), jump: this.keysFor('jump'), dive: this.keysFor('dive'), pause: this.keysFor('pause') }))}</p>
       </div>`);
     this.onAction('play', () => this.showModes());
     this.onAction('daily', () => this.startDaily());
@@ -729,22 +795,23 @@ export class App {
     // connect.
     const platformHosted = !!(this.platform && this.platform.active);
     const hostedOk = this.hosted && this.hosted.available && !platformHosted;
-    const hostedSub = hostedOk ? 'private rooms &amp; quick join (dev server)'
-      : platformHosted ? 'not available on this platform — local modes are fully playable'
-      : 'needs the hosted server';
+    this.redraw = () => this.showModes();
+    const hostedSub = hostedOk ? t('hostedSubOk') : platformHosted ? t('hostedSubPlatform') : t('hostedSubNone');
+    const card = (act, title, sub, attrs = '') =>
+      `<button class="card" data-act="${act}" ${attrs}><span class="card-title">${esc(t(title))}</span><span class="card-sub">${esc(sub)}</span></button>`;
     this.overlay(`
       <div class="panel" role="dialog" aria-labelledby="modes-h">
-        <h1 id="modes-h">Choose a mode</h1>
+        <h1 id="modes-h">${esc(t('modesH'))}</h1>
         <div class="card-grid mt">
-          <button class="card" data-act="learn"><span class="card-title">Learn</span><span class="card-sub">5 interactive lessons · ~5 min · unranked</span></button>
-          <button class="card" data-act="journey"><span class="card-title">Journey</span><span class="card-sub">40 stages · 5 themes · mastery crowns</span></button>
-          <button class="card" data-act="daily"><span class="card-title">Daily</span><span class="card-sub">one shared seed per UTC day · ranked locally</span></button>
-          <button class="card" data-act="practice"><span class="card-title">Practice</span><span class="card-sub">any course, your difficulty · unranked</span></button>
-          <button class="card" data-act="challenges"><span class="card-title">Challenges</span><span class="card-sub">restricted tools &amp; speed goals</span></button>
-          <button class="card" data-act="show"><span class="card-title">Show</span><span class="card-sub">elimination rounds to a final · 12–16 racers</span></button>
-          <button class="card" data-act="hosted" ${hostedOk ? '' : 'disabled'}><span class="card-title">Hosted play</span><span class="card-sub">${hostedSub}</span></button>
+          ${card('learn', 'learn', t('learnSub'))}
+          ${card('journey', 'journey', t('journeySub'))}
+          ${card('daily', 'daily', t('dailySub'))}
+          ${card('practice', 'practice', t('practiceSub'))}
+          ${card('challenges', 'challengesH', t('challengesSub'))}
+          ${card('show', 'show', t('showSub'))}
+          ${card('hosted', 'hostedPlay', hostedSub, hostedOk ? '' : 'disabled')}
         </div>
-        <div class="row mt"><button data-act="back">Back</button></div>
+        <div class="row mt"><button data-act="back">${esc(t('back'))}</button></div>
       </div>`);
     this.onAction('learn', () => this.showLearn());
     this.onAction('journey', () => this.showJourney());
@@ -758,18 +825,19 @@ export class App {
 
   showLearn() {
     this.leaveRound();
+    this.redraw = () => this.showLearn();
     const done = this.store.save.lessonsDone;
     const cards = LESSONS.map((l, i) => `
       <button class="card ${done[l.id] ? 'done' : ''}" data-lesson="${i}">
-        <span class="card-title">${i + 1}. ${esc(l.title)}</span>
-        <span class="card-sub">${esc(l.intro.slice(0, 60))}…</span>
+        <span class="card-title">${i + 1}. ${esc(tn('lessons', l.id, l.title))}</span>
+        <span class="card-sub">${esc(lessonText(l.id, l.intro))}</span>
       </button>`).join('');
     this.overlay(`
       <div class="panel" role="dialog" aria-labelledby="learn-h">
-        <h1 id="learn-h">Learn</h1>
-        <p class="muted">One rule at a time. Perform each action to advance.</p>
+        <h1 id="learn-h">${esc(t('learn'))}</h1>
+        <p class="muted">${esc(t('learnSubtitle'))}</p>
         <div class="card-grid mt">${cards}</div>
-        <div class="row mt"><button data-act="back">Back</button></div>
+        <div class="row mt"><button data-act="back">${esc(t('back'))}</button></div>
       </div>`);
     el('screens').querySelectorAll('[data-lesson]').forEach(b =>
       b.addEventListener('click', () => { this.audio.event({ t: 'ui' }); this.startLesson(+b.dataset.lesson); }));
@@ -778,6 +846,7 @@ export class App {
 
   showJourney() {
     this.leaveRound();
+    this.redraw = () => this.showJourney();
     const save = this.store.save;
     const cards = JOURNEY.map((st) => {
       const id = 'j' + String(st.stage).padStart(2, '0');
@@ -785,16 +854,16 @@ export class App {
       const passed = !!save.journey.passed[id];
       const crown = !!save.journey.crowns[id];
       return `<button class="card ${locked ? 'locked' : ''} ${passed ? 'done' : ''} ${st.mastery ? 'mastery' : ''}" data-stage="${st.stage}" ${locked ? 'disabled' : ''}>
-        <span class="card-title">${st.stage}. ${esc(st.name)}${crown ? ' ♛' : ''}</span>
-        <span class="card-sub">${esc(themeById(st.theme).name)} · top ${st.passPlace} · ${st.mechanics.join(', ')}</span>
+        <span class="card-title">${st.stage}. ${esc(courseName(st))}${crown ? ' ♛' : ''}</span>
+        <span class="card-sub">${esc(themeName(st.theme, themeById(st.theme).name))} · ${esc(t('topN', { n: st.passPlace }))} · ${esc(st.mechanics.map(mechanicName).join(', '))}</span>
       </button>`;
     }).join('');
     this.overlay(`
       <div class="panel wide" role="dialog" aria-labelledby="journey-h">
-        <h1 id="journey-h">Journey</h1>
-        <p class="muted">Unlocked through stage ${save.journey.unlocked}. Mastery stages award ♛ crowns.</p>
+        <h1 id="journey-h">${esc(t('journey'))}</h1>
+        <p class="muted">${esc(t('journeyUnlocked', { n: save.journey.unlocked }))}</p>
         <div class="card-grid mt">${cards}</div>
-        <div class="row mt"><button data-act="back">Back</button></div>
+        <div class="row mt"><button data-act="back">${esc(t('back'))}</button></div>
       </div>`);
     el('screens').querySelectorAll('[data-stage]').forEach(b =>
       b.addEventListener('click', () => { this.audio.event({ t: 'ui' }); this.startJourneyStage(+b.dataset.stage); }));
@@ -803,24 +872,28 @@ export class App {
 
   showPractice() {
     this.leaveRound();
-    const options = [...JOURNEY.map(s => ({ id: s.id, name: `${s.stage}. ${s.name}` })), ...ARENAS.map(a => ({ id: a.id, name: a.name + ' (survival)' }))]
-      .map(o => `<option value="${o.id}">${esc(o.name)}</option>`).join('');
+    // Re-rendering keeps the player's current picks.
+    const keep = { course: el('prac-course')?.value, skill: el('prac-skill')?.value ?? '0.55', bots: el('prac-bots')?.value ?? '7' };
+    this.redraw = () => this.showPractice();
+    const options = [...JOURNEY.map(s => ({ id: s.id, name: `${s.stage}. ${courseName(s)}` })), ...ARENAS.map(a => ({ id: a.id, name: t('survivalTag', { name: courseName(a) }) }))]
+      .map(o => `<option value="${o.id}" ${o.id === keep.course ? 'selected' : ''}>${esc(o.name)}</option>`).join('');
+    const opts = (list, cur) => list.map(([v, label]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${esc(label)}</option>`).join('');
     this.overlay(`
       <div class="panel" role="dialog" aria-labelledby="prac-h">
-        <h1 id="prac-h">Practice</h1>
-        <p class="muted">Unranked. Restart any time with Esc → Retry.</p>
+        <h1 id="prac-h">${esc(t('practice'))}</h1>
+        <p class="muted">${esc(t('practiceSubtitle'))}</p>
         <div class="col mt">
-          <label class="field"><span>Course</span><select id="prac-course">${options}</select></label>
-          <label class="field"><span>Bot difficulty</span><select id="prac-skill">
-            <option value="0.3">Gentle</option><option value="0.55" selected>Medium</option><option value="0.8">Fierce</option><option value="1.0">Probe-class</option>
+          <label class="field"><span>${esc(t('courseLabel'))}</span><select id="prac-course">${options}</select></label>
+          <label class="field"><span>${esc(t('botDifficulty'))}</span><select id="prac-skill">
+            ${opts([['0.3', t('gentle')], ['0.55', t('medium')], ['0.8', t('fierce')], ['1.0', t('probe')]], keep.skill)}
           </select></label>
-          <label class="field"><span>Rivals</span><select id="prac-bots">
-            <option value="0">Solo</option><option value="3">3</option><option value="7" selected>7</option><option value="11">11</option>
+          <label class="field"><span>${esc(t('rivals'))}</span><select id="prac-bots">
+            ${opts([['0', t('solo')], ['3', '3'], ['7', '7'], ['11', '11']], keep.bots)}
           </select></label>
         </div>
         <div class="row mt">
-          <button class="primary" data-act="go">Start</button>
-          <button data-act="back">Back</button>
+          <button class="primary" data-act="go">${esc(t('start'))}</button>
+          <button data-act="back">${esc(t('back'))}</button>
         </div>
       </div>`);
     this.onAction('go', () => this.startPractice(el('prac-course').value, +el('prac-skill').value, +el('prac-bots').value));
@@ -829,17 +902,18 @@ export class App {
 
   showChallenges() {
     this.leaveRound();
+    this.redraw = () => this.showChallenges();
     const done = this.store.save.challengesDone;
     const cards = CHALLENGES.map(c => `
       <button class="card ${done[c.id] ? 'done' : ''}" data-chal="${c.id}">
-        <span class="card-title">${esc(c.name)}</span>
-        <span class="card-sub">${esc(c.desc)}</span>
+        <span class="card-title">${esc(tn('challenges', c.id, c.name))}</span>
+        <span class="card-sub">${esc(tn('challengeDesc', c.id, c.desc))}</span>
       </button>`).join('');
     this.overlay(`
       <div class="panel" role="dialog" aria-labelledby="chal-h">
-        <h1 id="chal-h">Challenges</h1>
+        <h1 id="chal-h">${esc(t('challengesH'))}</h1>
         <div class="card-grid mt">${cards}</div>
-        <div class="row mt"><button data-act="back">Back</button></div>
+        <div class="row mt"><button data-act="back">${esc(t('back'))}</button></div>
       </div>`);
     el('screens').querySelectorAll('[data-chal]').forEach(b =>
       b.addEventListener('click', () => { this.audio.event({ t: 'ui' }); this.startChallenge(b.dataset.chal); }));
@@ -848,17 +922,18 @@ export class App {
 
   showShowSetup() {
     this.leaveRound();
+    this.redraw = () => this.showShowSetup();
     const cards = SHOWS.map(s => `
       <button class="card" data-show="${s.id}">
-        <span class="card-title">${esc(s.name)}</span>
-        <span class="card-sub">${s.players} racers · ${s.rounds.length} rounds · ${s.rounds.map(r => r.quota).join(' → ')} qualify</span>
+        <span class="card-title">${esc(tn('shows', s.id, s.name))}</span>
+        <span class="card-sub">${esc(t('showCard', { players: s.players, rounds: s.rounds.length, quotas: s.rounds.map(r => r.quota).join(' → ') }))}</span>
       </button>`).join('');
     this.overlay(`
       <div class="panel" role="dialog" aria-labelledby="show-h">
-        <h1 id="show-h">Show</h1>
-        <p class="muted">Survive each cut. The final is a survival arena — last tumbler standing wins.</p>
+        <h1 id="show-h">${esc(t('show'))}</h1>
+        <p class="muted">${esc(t('showSubtitle'))}</p>
         <div class="card-grid mt">${cards}</div>
-        <div class="row mt"><button data-act="back">Back</button></div>
+        <div class="row mt"><button data-act="back">${esc(t('back'))}</button></div>
       </div>`);
     el('screens').querySelectorAll('[data-show]').forEach(b =>
       b.addEventListener('click', () => { this.audio.event({ t: 'ui' }); this.startShow(b.dataset.show); }));
@@ -867,26 +942,28 @@ export class App {
 
   showHosted() {
     this.leaveRound();
+    // The dev-server room UI relabels in place (no redraw: the socket and room state stay put).
+    this.redraw = null;
     this.overlay(`
       <div class="panel" role="dialog" aria-labelledby="host-h">
-        <h1 id="host-h">Hosted play</h1>
-        <p class="muted">Rooms run on the authoritative server: it simulates the round and decides results. Reconnect any time — you will get a fresh snapshot.</p>
+        <h1 id="host-h" data-i18n="hostedPlay">${esc(t('hostedPlay'))}</h1>
+        <p class="muted" data-i18n="hostedText">${esc(t('hostedText'))}</p>
         <div class="col mt">
-          <button class="primary" data-act="quick">Quick join (Quick Show)</button>
-          <label class="field"><span>Room code</span><input id="room-code" maxlength="6" style="font:inherit;min-height:44px;background:#1c2440;color:#fff;border-radius:8px;border:1px solid rgba(255,255,255,0.25);text-transform:uppercase" aria-label="Room code"></label>
+          <button class="primary" data-act="quick" data-i18n="quickJoin">${esc(t('quickJoin'))}</button>
+          <label class="field"><span data-i18n="roomCode">${esc(t('roomCode'))}</span><input id="room-code" maxlength="6" style="font:inherit;min-height:44px;background:#1c2440;color:#fff;border-radius:8px;border:1px solid rgba(255,255,255,0.25);text-transform:uppercase" aria-label="${esc(t('roomCode'))}" data-i18n-aria="roomCode"></label>
           <div class="row">
-            <button data-act="join">Join room</button>
-            <button data-act="create">Create room</button>
+            <button data-act="join" data-i18n="joinRoom">${esc(t('joinRoom'))}</button>
+            <button data-act="create" data-i18n="createRoom">${esc(t('createRoom'))}</button>
           </div>
         </div>
         <div id="hosted-status" class="mt small muted" role="status"></div>
-        <div class="row mt"><button data-act="back">Back</button></div>
+        <div class="row mt"><button data-act="back" data-i18n="back">${esc(t('back'))}</button></div>
       </div>`);
     const status = () => el('hosted-status');
     const ensure = async () => {
       if (!this.hosted.connected) {
-        status().textContent = 'Connecting…';
-        try { await this.hosted.connect(); } catch (e) { status().textContent = 'Could not reach the host: ' + e.message; return false; }
+        status().textContent = t('connecting');
+        try { await this.hosted.connect(); } catch (e) { status().textContent = t('cantReach', { error: e.message }); return false; }
       }
       return true;
     };
@@ -901,20 +978,20 @@ export class App {
     const statusEl = el('hosted-status');
     switch (msg.t) {
       case 'joined':
-        if (statusEl) statusEl.textContent = `In room ${msg.code} — ${msg.players} player(s). Waiting for host to start…`;
+        if (statusEl) statusEl.textContent = t('inRoom', { code: msg.code, n: msg.players });
         if (el('host-h')) {
           const pane = el('screens').querySelector('.panel');
           if (pane && !pane.querySelector('[data-act="ready"]')) {
             const row = document.createElement('div');
             row.className = 'row mt';
-            row.innerHTML = `<button class="primary" data-act="ready">Ready up</button>`;
+            row.innerHTML = `<button class="primary" data-act="ready" data-i18n="readyUp">${esc(t('readyUp'))}</button>`;
             pane.appendChild(row);
             this.onAction('ready', () => this.hosted.setReady(true));
           }
         }
         break;
       case 'lobby':
-        if (statusEl) statusEl.textContent = `Room ${msg.code}: ${msg.players.map(p => p.name + (p.ready ? ' ✓' : '')).join(', ')}`;
+        if (statusEl) statusEl.textContent = t('roomList', { code: msg.code, players: msg.players.map(p => p.name + (p.ready ? ' ✓' : '')).join(', ') });
         break;
       case 'start':
         this.startHostedRound(msg);
@@ -923,13 +1000,13 @@ export class App {
         if (this.hostedRound) this.applyHostedSnapshot(msg);
         break;
       case 'result':
-        if (statusEl) statusEl.textContent = 'Round over — results decided by the server.';
+        if (statusEl) statusEl.textContent = t('roundOverServer');
         break;
       case 'error':
-        if (statusEl) statusEl.textContent = 'Host: ' + msg.error;
+        if (statusEl) statusEl.textContent = t('hostError', { error: msg.error });
         break;
       case 'disconnected':
-        if (statusEl) statusEl.textContent = 'Disconnected — reconnecting…';
+        if (statusEl) statusEl.textContent = t('reconnecting');
         break;
     }
   }
@@ -958,8 +1035,8 @@ export class App {
     el('screens').innerHTML = '';
     el('hud').classList.remove('hidden');
     if ('ontouchstart' in window) el('touch-ui').classList.remove('hidden');
-    el('hud-title').textContent = def.name || def.id;
-    el('hud-goal').textContent = 'Hosted round — server is authoritative';
+    this.roundDef = def;
+    this.renderRoundText();
   }
 
   applyHostedSnapshot(msg) {
@@ -974,15 +1051,16 @@ export class App {
   }
 
   showPause() {
+    this.redraw = () => this.showPause();
     this.overlay(`
       <div class="panel" role="dialog" aria-labelledby="pause-h">
-        <h1 id="pause-h">Paused</h1>
+        <h1 id="pause-h">${esc(t('paused'))}</h1>
         <div class="col mt">
-          <button class="primary" data-act="resume">Resume</button>
-          <button data-act="retry">Retry round</button>
-          <button data-act="settings">Settings</button>
-          <button data-act="help">Help</button>
-          <button class="danger" data-act="quit">Leave round</button>
+          <button class="primary" data-act="resume">${esc(t('resume'))}</button>
+          <button data-act="retry">${esc(t('retryRound'))}</button>
+          <button data-act="settings">${esc(t('settings'))}</button>
+          <button data-act="help">${esc(t('help'))}</button>
+          <button class="danger" data-act="quit">${esc(t('leaveRound'))}</button>
         </div>
       </div>`);
     this.onAction('resume', () => this.resumeRound());
@@ -994,34 +1072,39 @@ export class App {
 
   resumeRoundSilent() { el('screens').innerHTML = ''; }
 
+  // Settings relabels in place on a language change (data-i18n): the shared
+  // Sound / Language / Report sections stay mounted after the Graphics box.
   showSettings(back) {
+    this.redraw = null;
     const s = this.settings;
+    const L = (key) => `<span data-i18n="${key}">${esc(t(key))}</span>`;
+    const pal = { standard: 'palStandard', deuteranopia: 'palDeut', protanopia: 'palProt', tritanopia: 'palTrit' };
     this.overlay(`
       <div class="panel" role="dialog" aria-labelledby="set-h">
-        <h1 id="set-h">Settings</h1>
-        <h2>Audio</h2>
-        ${this.slider('set-music', 'Music', s.music)}
-        ${this.slider('set-effects', 'Effects', s.effects)}
-        ${this.slider('set-ambience', 'Ambience', s.ambience)}
-        ${this.check('set-captions', 'Captions for sound cues', s.captions)}
-        <h2>Graphics</h2>
-        <div id="gfx-section" class="gfx-section"></div>
-        ${this.check('set-shake', 'Camera shake', s.cameraShake)}
-        <label class="field"><span>Camera</span><select id="set-camera">
-          <option value="follow" ${s.camera === 'follow' ? 'selected' : ''}>follow</option>
-          <option value="far" ${s.camera === 'far' ? 'selected' : ''}>far</option>
+        <h1 id="set-h" data-i18n="settings">${esc(t('settings'))}</h1>
+        <h2 data-i18n="audio">${esc(t('audio'))}</h2>
+        ${this.slider('set-music', 'music', s.music)}
+        ${this.slider('set-effects', 'effects', s.effects)}
+        ${this.slider('set-ambience', 'ambience', s.ambience)}
+        ${this.check('set-captions', 'captions', s.captions)}
+        <h2 data-i18n="graphics">${esc(t('graphics'))}</h2>
+        <div id="gfx-section" class="gfx-section" data-options-graphics><div id="gfx-box"></div></div>
+        ${this.check('set-shake', 'cameraShake', s.cameraShake)}
+        <label class="field">${L('camera')}<select id="set-camera">
+          <option value="follow" ${s.camera === 'follow' ? 'selected' : ''} data-i18n="camFollow">${esc(t('camFollow'))}</option>
+          <option value="far" ${s.camera === 'far' ? 'selected' : ''} data-i18n="camFar">${esc(t('camFar'))}</option>
         </select></label>
-        <h2>Accessibility</h2>
-        ${this.check('set-rm', 'Reduced motion', s.reducedMotion)}
-        ${this.check('set-hc', 'High contrast', s.highContrast)}
-        <label class="field"><span>Color palette</span><select id="set-palette">
-          ${['standard', 'deuteranopia', 'protanopia', 'tritanopia'].map(p => `<option ${s.palette === p ? 'selected' : ''}>${p}</option>`).join('')}
+        <h2 data-i18n="accessibility">${esc(t('accessibility'))}</h2>
+        ${this.check('set-rm', 'reducedMotion', s.reducedMotion)}
+        ${this.check('set-hc', 'highContrast', s.highContrast)}
+        <label class="field">${L('colorPalette')}<select id="set-palette">
+          ${Object.entries(pal).map(([p, k]) => `<option value="${p}" ${s.palette === p ? 'selected' : ''} data-i18n="${k}">${esc(t(k))}</option>`).join('')}
         </select></label>
-        ${this.slider('set-text', 'Text size', s.textScale)}
-        ${this.check('set-lefty', 'Left-handed touch controls', s.leftHanded)}
+        ${this.slider('set-text', 'textSize', s.textScale)}
+        ${this.check('set-lefty', 'leftHanded', s.leftHanded)}
         <div class="row mt">
-          <button class="primary" data-act="done">Done</button>
-          <button data-act="replay-tutorial">Replay tutorial</button>
+          <button class="primary" data-act="done" data-i18n="done">${esc(t('done'))}</button>
+          <button data-act="replay-tutorial" data-i18n="replayTutorial">${esc(t('replayTutorial'))}</button>
         </div>
       </div>`);
     const bind = (id, fn) => el(id).addEventListener('change', (e) => { fn(e.target); this.store.persist(); this.applySettings(); this.pushSettings(); this.audio.event({ t: 'ui' }); });
@@ -1045,9 +1128,10 @@ export class App {
   // resolution, frame-rate readout and a GPU / cost summary. Changes apply
   // live and persist in settings.gfx.
   renderGraphicsSection(focusId) {
-    const box = el('gfx-section');
+    // Only the inner box redraws, so the shared sections mounted after it survive.
+    const box = el('gfx-box');
     if (!box) return;
-    const T = gfxStrings(navigator.language);
+    const T = gfxStrings(locale());
     const s = this.settings;
     const saved = s.gfx || {};
     const info = this.scene.graphicsInfo();
@@ -1104,31 +1188,33 @@ export class App {
     this.gfxTimer = setInterval(summary, 500);
   }
 
-  slider(id, label, v) {
-    return `<label class="field"><span>${label}</span><input type="range" id="${id}" min="0" max="1" step="0.05" value="${v}" aria-label="${label}"></label>`;
+  slider(id, key, v) {
+    return `<label class="field"><span data-i18n="${key}">${esc(t(key))}</span><input type="range" id="${id}" min="0" max="1" step="0.05" value="${v}" aria-label="${esc(t(key))}" data-i18n-aria="${key}"></label>`;
   }
-  check(id, label, v) {
-    return `<label class="field"><span>${label}</span><input type="checkbox" id="${id}" ${v ? 'checked' : ''} aria-label="${label}"></label>`;
+  check(id, key, v) {
+    return `<label class="field"><span data-i18n="${key}">${esc(t(key))}</span><input type="checkbox" id="${id}" ${v ? 'checked' : ''} aria-label="${esc(t(key))}" data-i18n-aria="${key}"></label>`;
   }
 
   showHelp(back) {
+    this.redraw = () => this.showHelp(back);
+    const r = (key, rowKey, keys) => `<tr><td>${esc(t(key))}</td><td>${esc(t(rowKey, { keys }))}</td></tr>`;
     this.overlay(`
       <div class="panel" role="dialog" aria-labelledby="help-h">
-        <h1 id="help-h">How to play</h1>
-        <h2>Goal</h2>
-        <p>Race to the finish gate before the cutoff. Green rings are checkpoints — falling returns you to your last ring. In survival arenas, stay on the disc: last tumbler standing wins.</p>
-        <h2>Controls</h2>
-        <table class="score" aria-label="Controls">
-          <tr><td>Move</td><td>${esc(this.keysFor('forward', 'left', 'back', 'right'))} / left stick / touch stick</td></tr>
-          <tr><td>Jump</td><td>${esc(this.keysFor('jump'))} / gamepad A / Jump button</td></tr>
-          <tr><td>Dive</td><td>${esc(this.keysFor('dive'))} / gamepad B / Dive button</td></tr>
-          <tr><td>Pause</td><td>${esc(this.keysFor('pause'))} / gamepad Start</td></tr>
+        <h1 id="help-h">${esc(t('howToPlay'))}</h1>
+        <h2>${esc(t('goal'))}</h2>
+        <p>${esc(t('goalText'))}</p>
+        <h2>${esc(t('controls'))}</h2>
+        <table class="score" aria-label="${esc(t('controls'))}">
+          ${r('move', 'moveRow', this.keysFor('forward', 'left', 'back', 'right'))}
+          ${r('jump', 'jumpRow', this.keysFor('jump'))}
+          ${r('dive', 'diveRow', this.keysFor('dive'))}
+          ${r('pause', 'pauseRow', this.keysFor('pause'))}
         </table>
-        <h2>Rules cards</h2>
-        <p>Jump clears gaps up to ~3.5m. Dive mid-air to lunge across wider gaps — you need a moment to get up after landing. Spinning bars, swinging hammers, pistons and bumpers knock you flying; weave walls only open where the gap is. Conveyor belts and fans push you — lean against them. After a hit you flash briefly: nothing can knock you again during the flash.</p>
-        <h2>Fair play</h2>
-        <p>Every course is seeded and every round records a deterministic replay, verified on the results screen. Ties break on objective progress, fewer invalid actions, then elapsed time.</p>
-        <div class="row mt"><button class="primary" data-act="done">Done</button></div>
+        <h2>${esc(t('rulesCards'))}</h2>
+        <p>${esc(t('rulesText'))}</p>
+        <h2>${esc(t('fairPlay'))}</h2>
+        <p>${esc(t('fairText'))}</p>
+        <div class="row mt"><button class="primary" data-act="done">${esc(t('done'))}</button></div>
       </div>`);
     this.onAction('done', () => back());
   }
@@ -1232,7 +1318,7 @@ export class App {
     this.toastTimer = setTimeout(() => t.classList.add('hidden'), 3500);
   }
 
-  profileName() { return (this.platform && this.platform.nickname) || 'You'; }
+  profileName() { return (this.platform && this.platform.nickname) || t('you'); }
 
   // Small account/sync line under the title logo: account nickname plus the
   // cloud-save state when hosted; guest note otherwise. Re-rendered whenever
@@ -1241,14 +1327,29 @@ export class App {
     const line = el('account-line');
     if (!line || !this.platform) return;
     if (!this.platform.active) {
-      line.textContent = 'Guest practice — progress stays on this device';
+      line.textContent = t('guestLine');
       return;
     }
-    const label = { synced: 'progress synced', saving: 'saving…', error: 'sync pending — will retry', offline: 'offline — local save' }[this.platform.status] || this.platform.status;
-    line.textContent = `Playing as ${this.profileName()} · ${label}`;
+    const key = { synced: 'syncSynced', saving: 'syncSaving', error: 'syncError', offline: 'syncOffline' }[this.platform.status];
+    line.textContent = t('playingAs', { name: playerName(this.profileName()), status: key ? t(key) : this.platform.status });
   }
 
   persistStats() { this.store.persist(); }
+
+  /** The cloud copy was merged in after a save conflict: re-apply settings, refresh the title. */
+  onSaveMerged() {
+    this.applySettings();
+    if (el('title-h') && this.redraw) this.redraw();
+  }
+}
+
+// Legal-action refusal reasons (sim.js) → string keys.
+const INVALID_KEYS = { inactive: 'rsnInactive', stunned: 'rsnStunned', airborne: 'rsnAirborne', cooldown: 'rsnCooldown', 'jump unavailable': 'rsnJump', 'dive unavailable': 'rsnDive' };
+
+/** Challenge outcome line (round.js reports kind + numbers; text is localized here). */
+function outcomeText(out) {
+  if (!out.key) return out.desc;
+  return t(out.key, out.vars);
 }
 
 function esc(s) { return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }

@@ -179,13 +179,18 @@ export class LocalRound {
     const p = this.state.players.find(pl => pl.id === this.localId);
     const g = this.goal;
     switch (g.kind) {
-      case 'finish': return { won: me.finished, desc: me.finished ? 'Finished!' : 'Did not finish' };
-      case 'time': return {
-        won: me.finished && me.finishTick <= g.ticks,
-        desc: me.finished ? `Finished in ${(me.finishTick / TICK_RATE).toFixed(1)}s (target ${(g.ticks / TICK_RATE).toFixed(1)}s)` : 'Did not finish',
-      };
-      case 'noFalls': return { won: me.finished && p.falls === 0, desc: me.finished ? `${p.falls} falls` : 'Did not finish' };
-      case 'win': return { won: me.place === 1, desc: me.place === 1 ? 'Last tumbler standing!' : `Placed #${me.place}` };
+      // desc is the English line; key/vars let the UI localize it.
+      case 'finish': return { won: me.finished, desc: me.finished ? 'Finished!' : 'Did not finish', key: me.finished ? 'outFinished' : 'outDnf' };
+      case 'time': {
+        const time = (me.finishTick / TICK_RATE).toFixed(1), target = (g.ticks / TICK_RATE).toFixed(1);
+        return {
+          won: me.finished && me.finishTick <= g.ticks,
+          desc: me.finished ? `Finished in ${time}s (target ${target}s)` : 'Did not finish',
+          key: me.finished ? 'outTime' : 'outDnf', vars: { time, target },
+        };
+      }
+      case 'noFalls': return { won: me.finished && p.falls === 0, desc: me.finished ? `${p.falls} falls` : 'Did not finish', key: me.finished ? 'outFalls' : 'outDnf', vars: { n: p.falls } };
+      case 'win': return { won: me.place === 1, desc: me.place === 1 ? 'Last tumbler standing!' : `Placed #${me.place}`, key: me.place === 1 ? 'outLast' : 'placedN', vars: { n: me.place } };
       default: return null;
     }
   }

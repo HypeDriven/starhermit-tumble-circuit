@@ -10,6 +10,7 @@
 <meta name="description" content="Race through kinetic sky courses, survive eliminations, reach the final.">
 <link rel="stylesheet" href="css/main.css">
 <script src="game-options.js" data-game="tumble-circuit"></script>
+<script src="sh-language.js"></script>
 <script type="importmap">{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }</script>
 <script src="ui-scale.js"></script>
 <script src="browser-guard.js"></script>
@@ -21,22 +22,22 @@
   <canvas id="gl" aria-hidden="true"></canvas>
 
   <!-- In-game HUD (semantic layer over the canvas) -->
-  <header id="hud" class="hidden" aria-label="Round status">
+  <header id="hud" class="hidden" aria-label="Round status" data-i18n-aria="hudAria">
     <div id="hud-objective">
       <h2 id="hud-title">Course</h2>
       <p id="hud-goal">Reach the finish</p>
     </div>
     <div id="hud-center">
-      <div id="hud-clock" role="timer" aria-label="Time remaining">0:00.00</div>
-      <div id="hud-place" aria-label="Current place">—</div>
+      <div id="hud-clock" role="timer" aria-label="Time remaining" data-i18n-aria="ariaTimeRemaining">0:00.00</div>
+      <div id="hud-place" aria-label="Current place" data-i18n-aria="ariaPlace">—</div>
     </div>
     <div id="hud-right">
-      <div id="hud-progress" role="progressbar" aria-label="Course progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div id="hud-progress" role="progressbar" aria-label="Course progress" data-i18n-aria="ariaProgress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
         <div id="hud-progress-fill"></div>
       </div>
-      <div id="hud-quota" aria-label="Qualification cutoff"></div>
+      <div id="hud-quota" aria-label="Qualification cutoff" data-i18n-aria="ariaCutoff"></div>
     </div>
-    <button id="btn-pause" class="icon-btn" aria-label="Pause" title="Pause (Esc)">II</button>
+    <button id="btn-pause" class="icon-btn" aria-label="Pause" title="Pause (Esc)" data-i18n-aria="pause" data-i18n-title="pauseTitle">II</button>
   </header>
 
   <!-- Lesson step banner -->
@@ -46,11 +47,11 @@
   <div id="countdown" class="hidden" aria-hidden="true"></div>
 
   <!-- Touch controls -->
-  <div id="touch-ui" class="hidden" aria-label="Touch controls">
-    <div id="stick-zone" aria-hidden="true"><div id="stick-base"><div id="stick-nub"></div></div><div id="stick-hint">Drag here to move</div></div>
+  <div id="touch-ui" class="hidden" aria-label="Touch controls" data-i18n-aria="touchControls">
+    <div id="stick-zone" aria-hidden="true"><div id="stick-base"><div id="stick-nub"></div></div><div id="stick-hint" data-i18n="stickHint">Drag here to move</div></div>
     <div id="touch-actions">
-      <button id="btn-jump" class="touch-btn" aria-label="Jump">Jump</button>
-      <button id="btn-dive" class="touch-btn" aria-label="Dive">Dive</button>
+      <button id="btn-jump" class="touch-btn" aria-label="Jump" data-i18n-aria="jump" data-i18n="jump">Jump</button>
+      <button id="btn-dive" class="touch-btn" aria-label="Dive" data-i18n-aria="dive" data-i18n="dive">Dive</button>
     </div>
   </div>
 
@@ -66,6 +67,6 @@
 
   <noscript><p style="color:#fff;padding:2rem">Tumble Circuit needs JavaScript to run.</p></noscript>
 </div>
-<script type="module" src="js/main.js?v=fb35e982"></script>
+<script type="module" src="js/main.js?v=c84a36d1"></script>
 </body>
 </html>

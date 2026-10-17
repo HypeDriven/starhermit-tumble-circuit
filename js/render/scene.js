@@ -1049,7 +1049,18 @@ export class GameScene {
     }
   }
 
-  spawnBurst(x, y, z, color, n = 10) {
+  /** Redraw a player's name sprite (e.g. the localized "You" after a language change). */
+  setPlayerName(id, name, color) {
+    const v = this.playerViews.get(id);
+    if (!v || !v.label) return;
+    v.grp.remove(v.label);
+    disposeDeep(v.label);
+    v.label = makeNameSprite(name, color);
+    v.label.position.y = 2.1;
+    v.grp.add(v.label);
+  }
+
+    spawnBurst(x, y, z, color, n = 10) {
     const high = this.q.particles === 'high';
     const count = Math.round(n * (high ? 1 : 0.3));
     for (let i = 0; i < count; i++) {

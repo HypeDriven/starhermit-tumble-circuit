@@ -95,7 +95,8 @@ export class AudioEngine {
   resume() { if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume(); }
   suspend() { if (this.ctx && this.ctx.state === 'running') this.ctx.suspend(); }
 
-  caption(text) { if (this.captionsOn) this.onCaption(text); }
+  // Caption cue by string key; the UI localizes it.
+  caption(key) { if (this.captionsOn) this.onCaption(key); }
 
   // ---- SFX primitives -------------------------------------------------
   blip({ f0 = 440, f1 = null, dur = 0.12, type = 'square', vol = 0.5, bus = 'effects', when = 0 }) {
@@ -135,22 +136,22 @@ export class AudioEngine {
     switch (ev.t) {
       case 'ui': if (!sampled) this.blip({ f0: 660, f1: 880, dur: 0.06, type: 'sine', vol: 0.25 }); break;
       case 'ui-back': if (!sampled) this.blip({ f0: 520, f1: 330, dur: 0.07, type: 'sine', vol: 0.22 }); break;
-      case 'invalid': if (!sampled) this.blip({ f0: 180, f1: 120, dur: 0.12, type: 'sawtooth', vol: 0.2 }); this.caption('not allowed'); break;
+      case 'invalid': if (!sampled) this.blip({ f0: 180, f1: 120, dur: 0.12, type: 'sawtooth', vol: 0.2 }); this.caption('capInvalid'); break;
       case 'countdown': if (!sampled) this.blip({ f0: 440 * pv, dur: 0.1, type: 'sine', vol: 0.4 }); break;
-      case 'go': if (!sampled) this.blip({ f0: 660 * pv, f1: 990, dur: 0.22, type: 'sine', vol: 0.5 }); this.caption('Go!'); break;
+      case 'go': if (!sampled) this.blip({ f0: 660 * pv, f1: 990, dur: 0.22, type: 'sine', vol: 0.5 }); this.caption('capGo'); break;
       case 'jump': if (!sampled) this.blip({ f0: 300 * pv, f1: 560 * pv, dur: 0.1, type: 'triangle', vol: 0.3 }); break;
-      case 'dive': if (!sampled) { this.noise({ dur: 0.18, vol: 0.25, freq: 900 }); this.blip({ f0: 500, f1: 240, dur: 0.16, type: 'triangle', vol: 0.22 }); } this.caption('dive'); break;
+      case 'dive': if (!sampled) { this.noise({ dur: 0.18, vol: 0.25, freq: 900 }); this.blip({ f0: 500, f1: 240, dur: 0.16, type: 'triangle', vol: 0.22 }); } this.caption('capDive'); break;
       case 'land': if (!sampled) this.noise({ dur: 0.09, vol: Math.min(0.4, 0.1 + (ev.impact || 0) * 0.02), freq: 300, q: 0.7 }); break;
-      case 'bounce': if (!sampled) this.blip({ f0: 240, f1: 720 * pv, dur: 0.16, type: 'sine', vol: 0.35 }); this.caption('boing'); break;
-      case 'knock': if (!sampled) { this.noise({ dur: 0.2, vol: 0.5, freq: 500, q: 0.6 }); this.blip({ f0: 220, f1: 90, dur: 0.22, type: 'sawtooth', vol: 0.3 }); } this.caption('knocked!'); break;
-      case 'fall': if (!sampled) this.blip({ f0: 500, f1: 140, dur: 0.35, type: 'sine', vol: 0.3 }); this.caption('fall'); break;
-      case 'respawn': if (!sampled) this.blip({ f0: 330, f1: 660, dur: 0.14, type: 'sine', vol: 0.3 }); this.caption('back at checkpoint'); break;
-      case 'checkpoint': if (!sampled) { this.blip({ f0: 587 * pv, f1: 880 * pv, dur: 0.14, type: 'sine', vol: 0.4 }); this.blip({ f0: 1174, dur: 0.1, type: 'sine', vol: 0.25, when: 0.07 }); } this.caption('checkpoint'); break;
-      case 'finish': if (!sampled) [523, 659, 784, 1046].forEach((f, i) => this.blip({ f0: f * pv, dur: 0.16, type: 'triangle', vol: 0.35, when: i * 0.09 })); this.caption('finished!'); break;
-      case 'out': if (!sampled) this.blip({ f0: 392, f1: 196, dur: 0.3, type: 'triangle', vol: 0.35 }); this.caption('eliminated'); break;
+      case 'bounce': if (!sampled) this.blip({ f0: 240, f1: 720 * pv, dur: 0.16, type: 'sine', vol: 0.35 }); this.caption('capBoing'); break;
+      case 'knock': if (!sampled) { this.noise({ dur: 0.2, vol: 0.5, freq: 500, q: 0.6 }); this.blip({ f0: 220, f1: 90, dur: 0.22, type: 'sawtooth', vol: 0.3 }); } this.caption('capKnock'); break;
+      case 'fall': if (!sampled) this.blip({ f0: 500, f1: 140, dur: 0.35, type: 'sine', vol: 0.3 }); this.caption('capFall'); break;
+      case 'respawn': if (!sampled) this.blip({ f0: 330, f1: 660, dur: 0.14, type: 'sine', vol: 0.3 }); this.caption('capRespawn'); break;
+      case 'checkpoint': if (!sampled) { this.blip({ f0: 587 * pv, f1: 880 * pv, dur: 0.14, type: 'sine', vol: 0.4 }); this.blip({ f0: 1174, dur: 0.1, type: 'sine', vol: 0.25, when: 0.07 }); } this.caption('capCheckpoint'); break;
+      case 'finish': if (!sampled) [523, 659, 784, 1046].forEach((f, i) => this.blip({ f0: f * pv, dur: 0.16, type: 'triangle', vol: 0.35, when: i * 0.09 })); this.caption('capFinish'); break;
+      case 'out': if (!sampled) this.blip({ f0: 392, f1: 196, dur: 0.3, type: 'triangle', vol: 0.35 }); this.caption('capOut'); break;
       case 'round-end': if (!sampled) [392, 523, 659].forEach((f, i) => this.blip({ f0: f, dur: 0.2, type: 'triangle', vol: 0.3, when: i * 0.12 })); break;
-      case 'champion': if (!sampled) [523, 659, 784, 1046, 1318].forEach((f, i) => this.blip({ f0: f, dur: 0.22, type: 'triangle', vol: 0.4, when: i * 0.11 })); this.caption('champion!'); break;
-      case 'achievement': if (!sampled) { this.blip({ f0: 880, f1: 1320, dur: 0.18, type: 'sine', vol: 0.35 }); this.blip({ f0: 1760, dur: 0.2, type: 'sine', vol: 0.2, when: 0.12 }); } this.caption('achievement unlocked'); break;
+      case 'champion': if (!sampled) [523, 659, 784, 1046, 1318].forEach((f, i) => this.blip({ f0: f, dur: 0.22, type: 'triangle', vol: 0.4, when: i * 0.11 })); this.caption('capChampion'); break;
+      case 'achievement': if (!sampled) { this.blip({ f0: 880, f1: 1320, dur: 0.18, type: 'sine', vol: 0.35 }); this.blip({ f0: 1760, dur: 0.2, type: 'sine', vol: 0.2, when: 0.12 }); } this.caption('capAchievement'); break;
     }
   }
 

@@ -13,6 +13,7 @@ export class Platform {
     this.status = 'offline'; // offline | saving | synced | error
     this.onStatus = null;  // sync-status render hook (app supplies it)
     this.onAuthChange = null; // (signedIn) => void, app supplies it
+    this.onConflict = null;   // saveconflict handler (main.js merges and saves again)
     this.ready = Promise.resolve();
     this._active = false;
   }
@@ -33,7 +34,9 @@ export class Platform {
     this._active = true;
     this.sub = sh.userId;
     this.slug = sh.slug;
-    sh.on('saved', (ok) => this._active && this.setStatus(ok ? 'synced' : 'error'));
+    sh.on('saved', (ok) => this._active && !(sh.saveConflicted && sh.saveConflicted()) && this.setStatus(ok ? 'synced' : 'error'));
+    // A write lost to a newer save from another device: main.js merges and saves again.
+    sh.on('saveconflict', () => { if (this._active && this.onConflict) { this.setStatus('saving'); this.onConflict(); } });
     sh.on('auth', (e) => {
       if (e && e.signedIn) return;
       this._active = false;
@@ -66,6 +69,9 @@ export class Platform {
     const p = await this.sh.profile();
     this.nickname = p ? p.displayName : 'Player ' + String(this.sub).slice(0, 6);
   }
+
+  /** True when the last cloud read failed (writes stay blocked until a read succeeds). */
+  loadFailed() { return !!(this.sh && this.sh.saveLoadFailed && this.sh.saveLoadFailed()); }
 
   // Sign-in button (only on *.starhermit.com without a token) and invites.
   canSignIn() { return !!(this.sh && this.sh.canSignIn()); }
