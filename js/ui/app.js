@@ -1180,7 +1180,7 @@ export class App {
       const i = this.scene.graphicsInfo();
       const line = el('gfx-summary');
       if (!line) { clearInterval(this.gfxTimer); return; }
-      line.textContent = `${i.gpu} · ${i.summary}`;
+      line.textContent = `${i.gpu} · ${(T.level || 'Level {level}').replace('{level}', i.level ?? 0)} · ${i.summary}`;
       el('gfx-note')?.classList.toggle('hidden', !i.postFailed);
     };
     summary();

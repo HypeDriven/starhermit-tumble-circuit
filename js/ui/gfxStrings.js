@@ -2,7 +2,7 @@
 // (app.js passes i18n.js locale()).
 
 const EN = {
-  quality: 'Quality', auto: 'Auto (detected: {tier})', scale: 'Render scale',
+  quality: 'Quality', level: 'Level {level}', auto: 'Auto (detected: {tier})', scale: 'Render scale',
   fromPreset: 'From preset ({tier})', adaptive: 'Adaptive resolution', showFps: 'Show frame rate',
   postFailed: 'Post-processing is unavailable on this device; rendering without it.',
   cats: {
@@ -21,7 +21,7 @@ const STRINGS = {
   'en-US': EN,
   'en-GB': { ...EN, cats: { ...EN.cats, grade: 'Colour grade' } },
   'es-419': {
-    quality: 'Calidad', auto: 'Automática (detectada: {tier})', scale: 'Escala de renderizado',
+    quality: 'Calidad', level: 'Nivel {level}', auto: 'Automática (detectada: {tier})', scale: 'Escala de renderizado',
     fromPreset: 'Según el ajuste ({tier})', adaptive: 'Resolución adaptable', showFps: 'Mostrar fotogramas por segundo',
     postFailed: 'El posprocesamiento no está disponible en este dispositivo; se renderiza sin él.',
     cats: {
@@ -36,7 +36,7 @@ const STRINGS = {
     },
   },
   'es-ES': {
-    quality: 'Calidad', auto: 'Automática (detectada: {tier})', scale: 'Escala de renderizado',
+    quality: 'Calidad', level: 'Nivel {level}', auto: 'Automática (detectada: {tier})', scale: 'Escala de renderizado',
     fromPreset: 'Según el preajuste ({tier})', adaptive: 'Resolución adaptativa', showFps: 'Mostrar fotogramas por segundo',
     postFailed: 'El posprocesado no está disponible en este dispositivo; se renderiza sin él.',
     cats: {
@@ -51,7 +51,7 @@ const STRINGS = {
     },
   },
   'de-DE': {
-    quality: 'Qualität', auto: 'Automatisch (erkannt: {tier})', scale: 'Renderskalierung',
+    quality: 'Qualität', level: 'Stufe {level}', auto: 'Automatisch (erkannt: {tier})', scale: 'Renderskalierung',
     fromPreset: 'Laut Voreinstellung ({tier})', adaptive: 'Adaptive Auflösung', showFps: 'Bildrate anzeigen',
     postFailed: 'Nachbearbeitung ist auf diesem Gerät nicht verfügbar; es wird ohne sie gerendert.',
     cats: {
@@ -66,7 +66,7 @@ const STRINGS = {
     },
   },
   'fr-FR': {
-    quality: 'Qualité', auto: 'Auto (détectée : {tier})', scale: 'Échelle de rendu',
+    quality: 'Qualité', level: 'Niveau {level}', auto: 'Auto (détectée : {tier})', scale: 'Échelle de rendu',
     fromPreset: 'Selon le préréglage ({tier})', adaptive: 'Résolution adaptative', showFps: 'Afficher les images par seconde',
     postFailed: 'Le post-traitement est indisponible sur cet appareil ; rendu sans post-traitement.',
     cats: {
@@ -81,7 +81,7 @@ const STRINGS = {
     },
   },
   'fr-CA': {
-    quality: 'Qualité', auto: 'Auto (détectée : {tier})', scale: 'Échelle de rendu',
+    quality: 'Qualité', level: 'Niveau {level}', auto: 'Auto (détectée : {tier})', scale: 'Échelle de rendu',
     fromPreset: 'Selon le préréglage ({tier})', adaptive: 'Résolution adaptative', showFps: 'Afficher la fréquence d’images',
     postFailed: 'Le post-traitement n’est pas offert sur cet appareil; rendu sans post-traitement.',
     cats: {
@@ -96,7 +96,7 @@ const STRINGS = {
     },
   },
   'pt-BR': {
-    quality: 'Qualidade', auto: 'Automática (detectada: {tier})', scale: 'Escala de renderização',
+    quality: 'Qualidade', level: 'Nível {level}', auto: 'Automática (detectada: {tier})', scale: 'Escala de renderização',
     fromPreset: 'Da predefinição ({tier})', adaptive: 'Resolução adaptável', showFps: 'Mostrar taxa de quadros',
     postFailed: 'O pós-processamento não está disponível neste dispositivo; renderizando sem ele.',
     cats: {
@@ -111,7 +111,7 @@ const STRINGS = {
     },
   },
   'it-IT': {
-    quality: 'Qualità', auto: 'Automatica (rilevata: {tier})', scale: 'Scala di rendering',
+    quality: 'Qualità', level: 'Livello {level}', auto: 'Automatica (rilevata: {tier})', scale: 'Scala di rendering',
     fromPreset: 'Dal preset ({tier})', adaptive: 'Risoluzione adattiva', showFps: 'Mostra frequenza fotogrammi',
     postFailed: 'La post-elaborazione non è disponibile su questo dispositivo; rendering senza.',
     cats: {

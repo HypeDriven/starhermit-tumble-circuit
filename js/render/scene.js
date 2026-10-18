@@ -20,7 +20,7 @@ import { Rng } from '../rules/rng.js';
 import { moverTransform, spinnerOmega, buildCourse } from '../rules/course.js';
 import { themeById } from '../content/themes.js';
 import { PSTATE } from '../rules/sim.js';
-import { detectPreset, describe, resolve, SHADOW_MAP } from './gfx.js';
+import { detectLevel, presetForLevel, describe, resolve, SHADOW_MAP, SPARK_CAP } from './gfx.js';
 
 const TAU = Math.PI * 2;
 
@@ -140,6 +140,7 @@ export class GameScene {
     this.mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '') ||
       ((navigator.maxTouchPoints || 0) > 0 && !!window.matchMedia && matchMedia('(pointer: coarse)').matches);
     this.detected = 'balanced';
+    this.level = 4;
     this.saved = {};
     this.q = resolve({}, 'low');
     this.canvasAA = true;
@@ -163,8 +164,12 @@ export class GameScene {
   initGL() {
     if (!this._makeRenderer(true)) return false;
     this.gpu = readGpu(this.renderer);
-    this.detected = detectPreset(this.gpu, this.mobile);
-    this.q = resolve({}, this.detected);
+    // StarHermit hardware level (gpu-level.js) → Auto preset: Low 0, Balanced 4, High 10, Ultra 17.
+    let sys = {};
+    try { sys = globalThis.StarHermitGpu?.detectSystem() || {}; } catch (e) { sys = {}; }
+    this.level = detectLevel(this.gpu, { ...sys, mobile: !!sys.mobile || this.mobile });
+    this.detected = presetForLevel(this.level);
+    this.q = resolve({}, this.detected, this.level);
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(55, 1, 0.1, 400);
     this.camTarget = new THREE.Vector3();
@@ -222,7 +227,7 @@ export class GameScene {
     this._gfxKey = key;
     this.saved = saved || {};
     const prev = this.q;
-    const g = resolve(this.saved, this.detected);
+    const g = resolve(this.saved, this.detected, this.level);
     this.q = g;
     if (!this.renderer) return;
     const wantAA = g.antialias === 'msaa' && !g.post;
@@ -239,7 +244,8 @@ export class GameScene {
     document.body.dataset.gfxPreset = g.preset;
     document.body.dataset.gfxAuto = g.auto ? '1' : '0';
     // detail / particle / background tiers change what is built: rebuild the course
-    const rebuild = prev && (prev.detail !== g.detail || prev.particles !== g.particles || prev.background !== g.background);
+    // (and so does the preset's budget: materials, geometry LOD, textures, decor, motes)
+    const rebuild = prev && (prev.preset !== g.preset || prev.detail !== g.detail || prev.particles !== g.particles || prev.background !== g.background);
     if (rebuild && this.course) this.rebuild();
     else this._refreshMaterials();
   }
@@ -250,6 +256,7 @@ export class GameScene {
     return {
       gpu: this.gpu || 'unknown GPU',
       detected: this.detected,
+      level: this.level,
       resolved: this.q,
       summary: describe(this.q, px),
       pixels: px,
@@ -330,7 +337,7 @@ export class GameScene {
       composer.setSize(w, h);
       composer.addPass(new RenderPass(this.scene, this.camera));
       if (g.ao !== 'off') {
-        const ao = new GTAOPass(this.scene, this.camera, pw, ph);
+        const ao = atScale(new GTAOPass(this.scene, this.camera, pw, ph), g.budget.aoRes);
         // name labels, sky and translucent decor never occlude
         const hide = ao.overrideVisibility.bind(ao);
         ao.overrideVisibility = () => {
@@ -345,7 +352,7 @@ export class GameScene {
       }
       if (g.bloom === 'on') {
         // only emissive rings, gates, pads and sparkles glow
-        composer.addPass(new GlowBloomPass(new THREE.Vector2(pw, ph), 0.4, 0.25, 0.2, this.scene, this.camera));
+        composer.addPass(atScale(new GlowBloomPass(new THREE.Vector2(pw, ph), 0.4, 0.25, 0.2, this.scene, this.camera), g.budget.bloomRes));
       }
       composer.addPass(new OutputPass());
       if (g.grade === 'on') {
@@ -479,11 +486,14 @@ export class GameScene {
     const C = (k) => pal[k] != null ? pal[k] : theme[k];
     const detailed = this.q.detail === 'detailed';
     const shadows = SHADOW_MAP[this.q.shadows] > 0;
+    const B = this.q.budget;
+    const seg = (n, min = 3) => Math.max(min, Math.round(n * B.segments));
+    const std = (params) => this._mat(params);
 
     // sky dome (gradient + sun glow + drifting high haze) + fog + lights
     this.scene.fog = new THREE.FogExp2(theme.fog.color, theme.fog.density);
     const sunDir = new THREE.Vector3(...theme.sun.pos).normalize();
-    const skyGeo = new THREE.SphereGeometry(320, 32, 20);
+    const skyGeo = new THREE.SphereGeometry(320, seg(32, 16), seg(20, 10));
     const skyMat = new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false, fog: false,
       uniforms: {
@@ -544,29 +554,29 @@ export class GameScene {
 
     // Toy-plastic surfaces: tiled tops and soft clearcoat on moving pieces at
     // the detailed tier; plain PBR otherwise. Gameplay colours are unchanged.
-    const tex = detailed ? this._surfaceTextures() : null;
+    const tex = detailed ? this._surfaceTextures(B.texture) : null;
     const glossy = (color, extra = {}) => detailed
-      ? new THREE.MeshPhysicalMaterial({ color, roughness: 0.42, metalness: 0, clearcoat: 0.55, clearcoatRoughness: 0.2, envMapIntensity: 0.3, ...extra })
-      : new THREE.MeshStandardMaterial({ color, roughness: 0.45, envMapIntensity: 0.3, ...extra });
+      ? this._mat({ color, roughness: 0.42, metalness: 0, clearcoat: 0.55, clearcoatRoughness: 0.2, envMapIntensity: 0.3, ...extra }, true)
+      : std({ color, roughness: 0.45, envMapIntensity: 0.3, ...extra });
     const box = (w, h, d) => detailed
       ? new RoundedBoxGeometry(w, h, d, 3, Math.min(0.22, w * 0.2, h * 0.3, d * 0.2))
       : new THREE.BoxGeometry(w, h, d);
 
-    const matTop = new THREE.MeshStandardMaterial({ color: theme.platform.top, roughness: 0.78, metalness: 0.02, envMapIntensity: 0.2, map: tex?.tiles || null });
-    const matSide = new THREE.MeshStandardMaterial({ color: theme.platform.side, roughness: 0.85, envMapIntensity: 0.5, map: tex?.stripes || null });
-    const matEdge = new THREE.MeshStandardMaterial({ color: theme.platform.edge, roughness: 0.45, emissive: theme.platform.edge, emissiveIntensity: 0.3, envMapIntensity: 0.3 });
-    const matUnder = new THREE.MeshStandardMaterial({ color: theme.platform.under, roughness: 1, envMapIntensity: 0.4 });
+    const matTop = std({ color: theme.platform.top, roughness: 0.78, metalness: 0.02, envMapIntensity: 0.2, map: tex?.tiles || null });
+    const matSide = std({ color: theme.platform.side, roughness: 0.85, envMapIntensity: 0.5, map: tex?.stripes || null });
+    const matEdge = std({ color: theme.platform.edge, roughness: 0.45, emissive: theme.platform.edge, emissiveIntensity: 0.3, envMapIntensity: 0.3 });
+    const matUnder = std({ color: theme.platform.under, roughness: 1, envMapIntensity: 0.4 });
 
     // platforms: slab with edge trim and underside skirt
     for (const p of course.platforms) {
       if (p.disc) {
-        const geo = new THREE.CylinderGeometry(p.r, p.r * 0.82, 1.6, 48);
+        const geo = new THREE.CylinderGeometry(p.r, p.r * 0.82, 1.6, seg(48, 24));
         if (tex) scaleUv(geo, p.r / 2, p.r / 2, true);
         const mesh = new THREE.Mesh(geo, [matSide, matTop, matUnder]);
         mesh.position.set(course.arena.cx, -0.8, course.arena.cz);
         mesh.receiveShadow = true;
         g.add(mesh);
-        const rim = new THREE.Mesh(new THREE.TorusGeometry(p.r - 0.1, 0.14, 10, 64), matEdge);
+        const rim = new THREE.Mesh(new THREE.TorusGeometry(p.r - 0.1, 0.14, seg(10, 4), seg(64, 32)), matEdge);
         rim.rotation.x = Math.PI / 2;
         rim.position.set(course.arena.cx, 0.02, course.arena.cz);
         g.add(rim);
@@ -583,7 +593,7 @@ export class GameScene {
       if (p.finish) {
         // finish pad: the whole top reads as the goal colour
         const edge = new THREE.Mesh(new THREE.BoxGeometry(w + 0.08, 0.12, d + 0.08),
-          new THREE.MeshStandardMaterial({ color: C('finish'), emissive: C('finish'), emissiveIntensity: 0.5, roughness: 0.4 }));
+          std({ color: C('finish'), emissive: C('finish'), emissiveIntensity: 0.5, roughness: 0.4 }));
         edge.position.set((p.x0 + p.x1) / 2, p.y + 0.02, (p.z0 + p.z1) / 2);
         edge.receiveShadow = true;
         g.add(edge);
@@ -620,21 +630,21 @@ export class GameScene {
 
     // obstacles
     const barMat = glossy(theme.obstacle.bar, { emissive: theme.obstacle.bar, emissiveIntensity: 0.3 });
-    const poleMat = new THREE.MeshStandardMaterial({ color: theme.obstacle.pole, roughness: 0.5, metalness: detailed ? 0.2 : 0, envMapIntensity: 0.4 });
+    const poleMat = std({ color: theme.obstacle.pole, roughness: 0.5, metalness: detailed ? 0.2 : 0, envMapIntensity: 0.4 });
     for (const ob of course.obstacles) {
       if (ob.kind === 'spinner') {
         const grp = new THREE.Group();
-        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.45, ob.h + 1.4, 16), poleMat);
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.45, ob.h + 1.4, seg(16, 8)), poleMat);
         pole.position.y = (ob.h + 1.4) / 2 - 0.6;
         grp.add(pole);
         if (detailed) {
-          const hub = new THREE.Mesh(new THREE.SphereGeometry(0.55, 20, 14), barMat);
+          const hub = new THREE.Mesh(new THREE.SphereGeometry(0.55, seg(20, 8), seg(14, 6)), barMat);
           hub.position.y = ob.h;
           grp.add(hub);
         }
         const arms = [];
         for (let k = 0; k < ob.arms; k++) {
-          const bar = new THREE.Mesh(new THREE.CapsuleGeometry(ob.barR, ob.L, 8, 16), barMat);
+          const bar = new THREE.Mesh(new THREE.CapsuleGeometry(ob.barR, ob.L, seg(8, 3), seg(16, 8)), barMat);
           bar.rotation.z = Math.PI / 2;
           const holder = new THREE.Group();
           bar.position.x = ob.L / 2;
@@ -650,9 +660,9 @@ export class GameScene {
         this.obstacleViews.push({ ob, kind: 'spinner', grp, arms });
       } else if (ob.kind === 'pendulum') {
         const grp = new THREE.Group();
-        const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, ob.L, 10), poleMat);
+        const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, ob.L, seg(10, 5)), poleMat);
         arm.position.y = -ob.L / 2;
-        const bob = new THREE.Mesh(new THREE.SphereGeometry(ob.bobR, 28, 20),
+        const bob = new THREE.Mesh(new THREE.SphereGeometry(ob.bobR, seg(28, 12), seg(20, 8)),
           glossy(theme.obstacle.bob, { emissive: theme.obstacle.bob, emissiveIntensity: 0.2 }));
         bob.position.y = -ob.L;
         grp.add(arm); grp.add(bob);
@@ -673,7 +683,7 @@ export class GameScene {
         g.add(block);
         this.obstacleViews.push({ ob, kind: 'piston', mesh: block });
       } else if (ob.kind === 'bumper') {
-        const mesh = new THREE.Mesh(new THREE.CylinderGeometry(ob.r, ob.r * 1.1, ob.h, 24),
+        const mesh = new THREE.Mesh(new THREE.CylinderGeometry(ob.r, ob.r * 1.1, ob.h, seg(24, 12)),
           glossy(theme.obstacle.bumper, { emissive: theme.obstacle.bumper, emissiveIntensity: 0.25 }));
         mesh.position.set(ob.x, ob.h / 2, ob.z);
         mesh.castShadow = shadows;
@@ -702,8 +712,8 @@ export class GameScene {
     // zones: bounce pads, conveyor arrows, fan streams
     for (const zn of course.zones) {
       if (zn.kind === 'bounce') {
-        const pad = new THREE.Mesh(new THREE.CylinderGeometry(zn.r, zn.r, 0.25, 28),
-          new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, emissive: theme.checkpoint, emissiveIntensity: 0.8 }));
+        const pad = new THREE.Mesh(new THREE.CylinderGeometry(zn.r, zn.r, 0.25, seg(28, 14)),
+          std({ color: 0xffffff, roughness: 0.3, emissive: theme.checkpoint, emissiveIntensity: 0.8 }));
         pad.position.set(zn.x, 0.12, zn.z);
         pad.userData.glow = true;
         g.add(pad);
@@ -742,8 +752,8 @@ export class GameScene {
     // checkpoint rings + finish gate (emissive: these are what bloom picks up)
     for (let i = 0; i < course.checkpoints.length; i++) {
       const cp = course.checkpoints[i];
-      const ring = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.16, 12, 64),
-        new THREE.MeshStandardMaterial({ color: C('checkpoint'), emissive: C('checkpoint'), emissiveIntensity: 1.0, roughness: 0.35 }));
+      const ring = new THREE.Mesh(new THREE.TorusGeometry(3.2, 0.16, seg(12, 5), seg(64, 32)),
+        std({ color: C('checkpoint'), emissive: C('checkpoint'), emissiveIntensity: 1.0, roughness: 0.35 }));
       ring.position.set(cp.x, 3.4, cp.z);
       ring.userData.glow = true;
       g.add(ring);
@@ -751,9 +761,9 @@ export class GameScene {
     }
     if (course.kind === 'race') {
       const gate = new THREE.Group();
-      const mat = new THREE.MeshStandardMaterial({ color: C('finish'), emissive: C('finish'), emissiveIntensity: 1.0, roughness: 0.3 });
+      const mat = std({ color: C('finish'), emissive: C('finish'), emissiveIntensity: 1.0, roughness: 0.3 });
       for (const s of [-1, 1]) {
-        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 6.4, 16), mat);
+        const post = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 6.4, seg(16, 8)), mat);
         post.position.set(s * (course.width / 2), 3.2, course.finishZ);
         gate.add(post);
       }
@@ -763,7 +773,7 @@ export class GameScene {
       if (detailed) {
         // chequered banner under the top beam
         const banner = new THREE.Mesh(new THREE.PlaneGeometry(course.width, 0.9),
-          new THREE.MeshStandardMaterial({ map: tex.checker, side: THREE.DoubleSide, roughness: 0.6 }));
+          std({ map: tex.checker, side: THREE.DoubleSide, roughness: 0.6 }));
         scaleUv(banner.geometry, course.width / 1.8, 1, false);
         banner.position.set(0, 5.65, course.finishZ);
         gate.add(banner);
@@ -779,13 +789,29 @@ export class GameScene {
     this.renderer.compile(this.scene, this.camera); // prewarm shaders
   }
 
-  // Procedural surface textures (shared, built once).
-  _surfaceTextures() {
-    if (this._tex) return this._tex;
+  // Material for the preset's budget: Lambert on Low (no PBR terms), Standard on Balanced, and the
+  // clearcoat Physical look (`glossy`) only on High/Ultra. Colours and emissive glow are kept.
+  _mat(params, glossy = false) {
+    const kind = this.q.budget.material;
+    if (kind === 'lambert') {
+      const { roughness, metalness, clearcoat, clearcoatRoughness, envMapIntensity, flatShading, ...rest } = params;
+      return new THREE.MeshLambertMaterial(rest);
+    }
+    if (glossy && kind === 'physical') return new THREE.MeshPhysicalMaterial(params);
+    const { clearcoat, clearcoatRoughness, ...rest } = params;
+    return new THREE.MeshStandardMaterial(rest);
+  }
+
+  // Procedural surface textures (shared, built once per texture size; drawn in 256-unit space).
+  _surfaceTextures(size = 256) {
+    this._texBySize = this._texBySize || {};
+    if (this._texBySize[size]) return this._texBySize[size];
     const make = (draw) => {
       const c = document.createElement('canvas');
-      c.width = c.height = 256;
-      draw(c.getContext('2d'));
+      c.width = c.height = size;
+      const ctx = c.getContext('2d');
+      ctx.scale(size / 256, size / 256);
+      draw(ctx);
       const t = new THREE.CanvasTexture(c);
       t.colorSpace = THREE.SRGBColorSpace;
       t.wrapS = t.wrapT = THREE.RepeatWrapping;
@@ -801,7 +827,7 @@ export class GameScene {
         ctx.fillRect(rng.range(0, 256), rng.range(0, 256), 2, 2);
       }
     };
-    this._tex = {
+    const tex = {
       tiles: make((ctx) => {
         // four soft tiles with rounded grout, subtle alternating value
         for (let y = 0; y < 2; y++) for (let x = 0; x < 2; x++) {
@@ -828,7 +854,8 @@ export class GameScene {
         }
       }),
     };
-    return this._tex;
+    this._texBySize[size] = tex;
+    return tex;
   }
 
   buildDecor(course, theme) {
@@ -838,21 +865,22 @@ export class GameScene {
     this.decorAnim = [];
     const detailed = this.q.detail === 'detailed';
     const kinds = theme.decor || ['cloud', 'island'];
-    const density = detailed ? 1 : 0.35;
+    const B = this.q.budget;
+    const density = (detailed ? 1 : 0.35) * B.decor;
     const count = Math.round(26 * density);
     // floating islands + clouds, deterministic
     const islandGeo = detailed ? new THREE.DodecahedronGeometry(1, 1) : new THREE.DodecahedronGeometry(1, 0);
     if (detailed) jitter(islandGeo, new Rng(course.seed, 'decor-rock'), 0.12);
-    const islandMat = new THREE.MeshStandardMaterial({ color: theme.platform.under, roughness: 1, flatShading: true, envMapIntensity: 0.4 });
+    const islandMat = this._mat({ color: theme.platform.under, roughness: 1, flatShading: true, envMapIntensity: 0.4 });
     const storm = kinds.includes('storm');
-    const cloudMat = new THREE.MeshStandardMaterial({
+    const cloudMat = this._mat({
       color: storm ? 0x8d99ae : 0xffffff, roughness: 1, envMapIntensity: 0.3,
       emissive: storm ? 0x3a4458 : new THREE.Color(theme.sky.horizon).lerp(new THREE.Color(0xffffff), 0.5),
       emissiveIntensity: detailed ? 0.35 : 0,
       transparent: true, opacity: storm ? 0.95 : 0.88,
     });
     const puffs = detailed ? 5 : 1;
-    const cloudGeo = new THREE.SphereGeometry(1, detailed ? 16 : 10, detailed ? 12 : 8);
+    const cloudGeo = new THREE.SphereGeometry(1, Math.max(8, Math.round((detailed ? 16 : 10) * B.segments)), Math.max(6, Math.round((detailed ? 12 : 8) * B.segments)));
     const islands = new THREE.InstancedMesh(islandGeo, islandMat, count);
     const clouds = new THREE.InstancedMesh(cloudGeo, cloudMat, count * 3 * puffs);
     clouds.userData.noAO = true;
@@ -911,7 +939,7 @@ export class GameScene {
       const n = Math.max(2, Math.round(6 * density));
       const mesh = new THREE.InstancedMesh(
         new THREE.SphereGeometry(1, 16, 12),
-        new THREE.MeshPhysicalMaterial({ color: theme.accent, roughness: 0.35, clearcoat: detailed ? 0.8 : 0, emissive: theme.accent, emissiveIntensity: 0.15 }), n);
+        this._mat({ color: theme.accent, roughness: 0.35, clearcoat: detailed ? 0.8 : 0, emissive: theme.accent, emissiveIntensity: 0.15 }, detailed), n);
       for (let i = 0; i < n; i++) {
         const ang = rng.range(0, TAU), rad = rng.range(28, 90);
         const sc = rng.range(1.1, 2.1);
@@ -927,7 +955,7 @@ export class GameScene {
       const n = Math.max(2, Math.round(5 * density));
       const mesh = new THREE.InstancedMesh(
         new THREE.ConeGeometry(1, 0.5, 4),
-        new THREE.MeshStandardMaterial({ color: theme.hazard, roughness: 0.6, emissive: theme.hazard, emissiveIntensity: 0.2 }), n);
+        this._mat({ color: theme.hazard, roughness: 0.6, emissive: theme.hazard, emissiveIntensity: 0.2 }), n);
       const rot = new THREE.Matrix4();
       for (let i = 0; i < n; i++) {
         const ang = rng.range(0, TAU), rad = rng.range(24, 80);
@@ -957,8 +985,8 @@ export class GameScene {
     }
     // floating light motes near the course (high particle tier)
     this.motes = null;
-    if (this.q.particles === 'high') {
-      const n = 140;
+    if (this.q.particles === 'high' && B.motes > 0) {
+      const n = B.motes;
       const base = new Float32Array(n * 3);
       for (let i = 0; i < n; i++) {
         base[i * 3] = rng.range(-20, 20);
@@ -1017,24 +1045,25 @@ export class GameScene {
   ensurePlayers(players) {
     const detailed = this.q.detail === 'detailed';
     const shadows = SHADOW_MAP[this.q.shadows] > 0;
+    const k = this.q.budget.segments;
     for (const p of players) {
       if (this.playerViews.has(p.id)) continue;
       const grp = new THREE.Group();
       const body = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.5, 0.7, 8, detailed ? 24 : 16),
+        new THREE.CapsuleGeometry(0.5, 0.7, Math.max(3, Math.round(8 * k)), Math.max(8, Math.round((detailed ? 24 : 16) * k))),
         detailed
-          ? new THREE.MeshPhysicalMaterial({ color: p.color, roughness: 0.4, clearcoat: 0.8, clearcoatRoughness: 0.2, envMapIntensity: 0.4 })
-          : new THREE.MeshStandardMaterial({ color: p.color, roughness: 0.45 }));
+          ? this._mat({ color: p.color, roughness: 0.4, clearcoat: 0.8, clearcoatRoughness: 0.2, envMapIntensity: 0.4 }, true)
+          : this._mat({ color: p.color, roughness: 0.45 }));
       body.position.y = 0.85;
       body.castShadow = shadows;
       grp.add(body);
       // face marker (direction cue readable without color)
-      const face = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10),
-        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 }));
+      const face = new THREE.Mesh(new THREE.SphereGeometry(0.16, Math.max(6, Math.round(12 * k)), Math.max(5, Math.round(10 * k))),
+        this._mat({ color: 0xffffff, roughness: 0.2 }));
       face.position.set(0, 1.15, 0.42);
       grp.add(face);
       // grounded ring marker (selection/state layer)
-      const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.72, 32),
+      const ring = new THREE.Mesh(new THREE.RingGeometry(0.5, 0.72, Math.max(16, Math.round(32 * k))),
         new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5, depthWrite: false }));
       ring.rotation.x = -Math.PI / 2;
       ring.position.y = 0.03;
@@ -1062,7 +1091,9 @@ export class GameScene {
 
     spawnBurst(x, y, z, color, n = 10) {
     const high = this.q.particles === 'high';
-    const count = Math.round(n * (high ? 1 : 0.3));
+    const B = this.q.budget;
+    const cap = Math.round(SPARK_CAP * B.sparks);
+    const count = Math.min(Math.round(n * (high ? 1 : 0.3) * B.sparks), cap - this.particles.length);
     for (let i = 0; i < count; i++) {
       // high tier: over-bright sparkles so bloom catches them
       const c = new THREE.Color(color);
@@ -1252,6 +1283,15 @@ function readGpu(renderer) {
   } catch (e) {
     return '';
   }
+}
+
+// Run a post pass at a fraction of the frame: EffectComposer resizes every pass to the full frame, so
+// the pass's own setSize applies the budget's scale.
+function atScale(pass, k) {
+  if (!(k > 0 && k < 1)) return pass;
+  const setSize = pass.setSize.bind(pass);
+  pass.setSize = (w, h) => setSize(Math.max(1, Math.round(w * k)), Math.max(1, Math.round(h * k)));
+  return pass;
 }
 
 function wrap(v, size) {

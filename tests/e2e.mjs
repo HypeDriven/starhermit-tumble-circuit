@@ -127,6 +127,8 @@ async function graphicsFlow(page, name) {
   await openGraphics(page);
   let st = await gfxState(page);
   if (st.select !== 'auto' || st.preset !== 'low') throw new Error(`expected Auto→low on a software GPU, got ${JSON.stringify(st)}`);
+  // the summary names the StarHermit hardware level (software GPU = level 0)
+  if (!/Level 0/.test(st.summary)) throw new Error(`summary lacks the hardware level: ${st.summary}`);
   // the section must fit inside the viewport width (no horizontal cut-off)
   const fits = await page.evaluate(() => {
     const vw = document.documentElement.clientWidth;
