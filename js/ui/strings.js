@@ -7,6 +7,7 @@
 // platformStrings.js; both follow the same locale.
 
 const enUS = {
+  progressMerged: 'Progress from another device was merged in.', preparingDaily: 'Preparing today’s course…', checkingReplay: 'Replay integrity: checking…', thinking: 'Working…', openOptions: 'Open Options', keyBindings: 'Key bindings', optionsNote: 'Volumes, graphics, language, reduced motion, high contrast and text size are in the StarHermit Options.',
   hudAria: 'Round status', ariaTimeRemaining: 'Time remaining', ariaPlace: 'Current place', ariaProgress: 'Course progress', ariaCutoff: 'Qualification cutoff',
   pause: 'Pause', pauseTitle: 'Pause (Esc)', touchControls: 'Touch controls', stickHint: 'Drag here to move', jump: 'Jump', dive: 'Dive',
   cannotStart: 'Cannot start', keptLocal: 'Your settings and progress are kept locally and unchanged.',
@@ -96,6 +97,7 @@ const enUS = {
 const enGB = { ...enUS, colorPalette: 'Colour palette', goalLesson: 'Lesson: {title} — reach the finish gate', lessonKeepH: '{lesson} — keep practising' };
 
 const es419 = {
+  progressMerged: 'Se combinó el progreso de otro dispositivo.', preparingDaily: 'Preparando el recorrido de hoy…', checkingReplay: 'Integridad de la repetición: comprobando…', thinking: 'Procesando…', openOptions: 'Abrir Opciones', keyBindings: 'Asignar teclas', optionsNote: 'El volumen, los gráficos, el idioma, el movimiento reducido, el alto contraste y el tamaño del texto están en las Opciones de StarHermit.',
   hudAria: 'Estado de la ronda', ariaTimeRemaining: 'Tiempo restante', ariaPlace: 'Posición actual', ariaProgress: 'Progreso del recorrido', ariaCutoff: 'Corte de clasificación',
   pause: 'Pausa', pauseTitle: 'Pausa (Esc)', touchControls: 'Controles táctiles', stickHint: 'Arrastra aquí para moverte', jump: 'Saltar', dive: 'Lanzarse',
   cannotStart: 'No se puede iniciar', keptLocal: 'Tu configuración y tu progreso se conservan en este dispositivo sin cambios.',
@@ -193,6 +195,7 @@ const esES = {
 };
 
 const deDE = {
+  progressMerged: 'Fortschritt von einem anderen Gerät wurde übernommen.', preparingDaily: 'Die heutige Strecke wird vorbereitet …', checkingReplay: 'Replay-Integrität: wird geprüft …', thinking: 'Wird berechnet …', openOptions: 'Optionen öffnen', keyBindings: 'Tastenbelegung', optionsNote: 'Lautstärke, Grafik, Sprache, reduzierte Bewegung, hoher Kontrast und Textgröße findest du in den StarHermit-Optionen.',
   hudAria: 'Rundenstatus', ariaTimeRemaining: 'Verbleibende Zeit', ariaPlace: 'Aktuelle Platzierung', ariaProgress: 'Streckenfortschritt', ariaCutoff: 'Qualifikationsgrenze',
   pause: 'Pause', pauseTitle: 'Pause (Esc)', touchControls: 'Touch-Steuerung', stickHint: 'Hier ziehen zum Bewegen', jump: 'Springen', dive: 'Hechten',
   cannotStart: 'Start nicht möglich', keptLocal: 'Deine Einstellungen und dein Fortschritt bleiben lokal unverändert erhalten.',
@@ -280,6 +283,7 @@ const deDE = {
 };
 
 const frFR = {
+  progressMerged: 'La progression d’un autre appareil a été fusionnée.', preparingDaily: 'Préparation du parcours du jour…', checkingReplay: 'Intégrité du replay : vérification…', thinking: 'Calcul en cours…', openOptions: 'Ouvrir les options', keyBindings: 'Touches', optionsNote: 'Volumes, graphismes, langue, mouvements réduits, contraste élevé et taille du texte se règlent dans les options StarHermit.',
   hudAria: 'État de la manche', ariaTimeRemaining: 'Temps restant', ariaPlace: 'Place actuelle', ariaProgress: 'Progression sur le parcours', ariaCutoff: 'Seuil de qualification',
   pause: 'Pause', pauseTitle: 'Pause (Échap)', touchControls: 'Commandes tactiles', stickHint: 'Glissez ici pour bouger', jump: 'Sauter', dive: 'Plonger',
   cannotStart: 'Démarrage impossible', keptLocal: 'Vos réglages et votre progression sont conservés localement, inchangés.',
@@ -373,6 +377,7 @@ const frCA = {
 };
 
 const ptBR = {
+  progressMerged: 'O progresso de outro dispositivo foi combinado.', preparingDaily: 'Preparando o percurso de hoje…', checkingReplay: 'Integridade do replay: verificando…', thinking: 'Processando…', openOptions: 'Abrir Opções', keyBindings: 'Teclas', optionsNote: 'Volume, gráficos, idioma, movimento reduzido, alto contraste e tamanho do texto ficam nas Opções do StarHermit.',
   hudAria: 'Status da rodada', ariaTimeRemaining: 'Tempo restante', ariaPlace: 'Posição atual', ariaProgress: 'Progresso no percurso', ariaCutoff: 'Corte de classificação',
   pause: 'Pausar', pauseTitle: 'Pausar (Esc)', touchControls: 'Controles de toque', stickHint: 'Arraste aqui para mover', jump: 'Pular', dive: 'Mergulhar',
   cannotStart: 'Não foi possível iniciar', keptLocal: 'Suas configurações e seu progresso continuam salvos no dispositivo, sem alterações.',
@@ -460,6 +465,7 @@ const ptBR = {
 };
 
 const itIT = {
+  progressMerged: 'I progressi di un altro dispositivo sono stati uniti.', preparingDaily: 'Preparazione del percorso di oggi…', checkingReplay: 'Integrità del replay: verifica in corso…', thinking: 'Elaborazione…', openOptions: 'Apri Opzioni', keyBindings: 'Tasti', optionsNote: 'Volume, grafica, lingua, movimento ridotto, alto contrasto e dimensione del testo sono nelle Opzioni di StarHermit.',
   hudAria: 'Stato del round', ariaTimeRemaining: 'Tempo rimasto', ariaPlace: 'Posizione attuale', ariaProgress: 'Avanzamento sul percorso', ariaCutoff: 'Soglia di qualificazione',
   pause: 'Pausa', pauseTitle: 'Pausa (Esc)', touchControls: 'Comandi touch', stickHint: 'Trascina qui per muoverti', jump: 'Salta', dive: 'Tuffo',
   cannotStart: 'Impossibile avviare', keptLocal: 'Le tue impostazioni e i tuoi progressi restano salvati in locale, invariati.',

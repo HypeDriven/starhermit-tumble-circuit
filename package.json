@@ -1,16 +1,16 @@
 {
   "name": "tumble-circuit",
   "version": "1.0.0",
-  "description": "Tumble Circuit \u2014 realtime sky-arena obstacle race. Browser distribution.",
+  "description": "Tumble Circuit — realtime sky-arena obstacle race. Browser distribution.",
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "node tests/run.mjs && node --test tests/gfx.test.mjs tests/platform.test.mjs tests/i18n.test.mjs",
-    "test:e2e": "node tests/e2e.mjs",
-    "serve": "node server.js",
+    "test": "node tests/run.mjs && node --test tests/i18n.test.mjs tests/save.test.mjs && node tests/native.mjs",
     "validate": "node tests/run.mjs --validate-only",
-    "smoke:ws": "node tests/ws-smoke.mjs",
-    "smoke:browser": "node tests/browser-smoke.mjs"
+    "package": "node tools/package-web.mjs",
+    "css": "node tools/css.mjs",
+    "test:browser": "node tools/browser-play.mjs",
+    "plan": "node tools/plan.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.62.1"

@@ -1,73 +1,18 @@
-<!DOCTYPE html>
+<!doctype html>
+<!-- StarHermit web loader, written by starhermit package --web: it pins the engine by hash and holds no script of its own; package again rather than edit it. -->
 <html lang="en">
 <head>
-  <link rel="icon" href="favicon.png" type="image/png">
-  <link rel="apple-touch-icon" href="./icon.png">
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#1a2440">
-<title>Tumble Circuit — sky arena obstacle race</title>
-<meta name="description" content="Race through kinetic sky courses, survive eliminations, reach the final.">
-<link rel="stylesheet" href="css/main.css">
-<script src="game-options.js" data-game="tumble-circuit"></script>
-<script src="sh-language.js"></script>
-<script type="importmap">{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }</script>
-<script src="ui-scale.js"></script>
-<script src="browser-guard.js"></script>
-<script src="starhermit-sdk.js"></script>
-<script>window.StarHermit && StarHermit.init();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="favicon.png">
+<title>Tumble Circuit</title>
+<style>html,body{margin:0;height:100%;background:#000;color:#eee;font:16px/1.5 system-ui,sans-serif}canvas{display:block;width:100%;height:100%}.starhermit-message{position:fixed;inset:0;margin:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:24px;text-align:center;background:#000}.starhermit-message[hidden]{display:none}.starhermit-late{animation:starhermit-late 0s 20s both}@keyframes starhermit-late{from{visibility:hidden}to{visibility:visible}}</style>
+<script type="module" src="https://wiki.starhermit.com/engine/1.21.0/starhermit.js" integrity="sha384-rzSHNTS20QZHOv1KvRW3/d7q8YZpxp08wQZuD3ffdTXIuOLVZ56RcX4hRHE8jlrN" crossorigin="anonymous"></script>
+<script type="application/json" id="starhermit-config">{"manifest":{"integrity":"sha384-n1aSvtsvXkQvR4NrU0va8XorELrRdW/Opzqqmcw3xrfwLuTBcg4U9a2OhQ7lvJAH","url":"https://wiki.starhermit.com/engine/1.21.0/manifest.json"}}</script>
 </head>
 <body>
-<div id="app">
-  <canvas id="gl" aria-hidden="true"></canvas>
-
-  <!-- In-game HUD (semantic layer over the canvas) -->
-  <header id="hud" class="hidden" aria-label="Round status" data-i18n-aria="hudAria">
-    <div id="hud-objective">
-      <h2 id="hud-title">Course</h2>
-      <p id="hud-goal">Reach the finish</p>
-    </div>
-    <div id="hud-center">
-      <div id="hud-clock" role="timer" aria-label="Time remaining" data-i18n-aria="ariaTimeRemaining">0:00.00</div>
-      <div id="hud-place" aria-label="Current place" data-i18n-aria="ariaPlace">—</div>
-    </div>
-    <div id="hud-right">
-      <div id="hud-progress" role="progressbar" aria-label="Course progress" data-i18n-aria="ariaProgress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-        <div id="hud-progress-fill"></div>
-      </div>
-      <div id="hud-quota" aria-label="Qualification cutoff" data-i18n-aria="ariaCutoff"></div>
-    </div>
-    <button id="btn-pause" class="icon-btn" aria-label="Pause" title="Pause (Esc)" data-i18n-aria="pause" data-i18n-title="pauseTitle">II</button>
-  </header>
-
-  <!-- Lesson step banner -->
-  <div id="lesson-banner" class="hidden" role="status" aria-live="polite"></div>
-
-  <!-- Countdown -->
-  <div id="countdown" class="hidden" aria-hidden="true"></div>
-
-  <!-- Touch controls -->
-  <div id="touch-ui" class="hidden" aria-label="Touch controls" data-i18n-aria="touchControls">
-    <div id="stick-zone" aria-hidden="true"><div id="stick-base"><div id="stick-nub"></div></div><div id="stick-hint" data-i18n="stickHint">Drag here to move</div></div>
-    <div id="touch-actions">
-      <button id="btn-jump" class="touch-btn" aria-label="Jump" data-i18n-aria="jump" data-i18n="jump">Jump</button>
-      <button id="btn-dive" class="touch-btn" aria-label="Dive" data-i18n-aria="dive" data-i18n="dive">Dive</button>
-    </div>
-  </div>
-
-  <!-- Screen root: menus & overlays are rendered here as semantic HTML -->
-  <main id="screens"></main>
-
-  <!-- Announcements for assistive tech -->
-  <div id="live" class="visually-hidden" aria-live="polite"></div>
-  <div id="live-urgent" class="visually-hidden" aria-live="assertive"></div>
-
-  <!-- Captions / text cues for meaningful audio -->
-  <div id="captions" class="hidden" aria-hidden="false"></div>
-
-  <noscript><p style="color:#fff;padding:2rem">Tumble Circuit needs JavaScript to run.</p></noscript>
-</div>
-<script src="gpu-level.js"></script>
-<script type="module" src="js/main.js?v=gfx-level-1"></script>
+<canvas></canvas>
+<div id="starhermit-status" class="starhermit-message" role="status"><span>Loading Tumble Circuit…</span><span class="starhermit-late">If the game has not started, this browser cannot run it or its engine (StarHermit 1.21.0) could not be loaded: reload the page, or open it in a current Chrome, Edge, Firefox or Safari.</span></div>
+<noscript><p class="starhermit-message">This game needs JavaScript.</p></noscript>
 </body>
 </html>

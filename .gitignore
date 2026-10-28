@@ -4,3 +4,6 @@ node_modules/
 .DS_Store
 test-results/
 .tmp-build/
+node_modules/
+.starhermit/
+*.log

@@ -58,7 +58,7 @@ export function dailyDef(dateStr = dailyDateString()) {
     if (!def) def = dailyCandidate(dateStr, 0);
     cache.set(dateStr, def);
   }
-  return structuredClone(def);
+  return JSON.parse(JSON.stringify(def)); // no structuredClone in the engine interpreter
 }
 
 export function dailyCandidate(dateStr, k = 0) {
