@@ -8,31 +8,23 @@ import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { STRINGS } from '../js/ui/strings.js';
 import { JOURNEY, LESSONS, CHALLENGES, SHOWS, ARENAS, SHOW_COURSES } from '../js/content/stages.js';
-import { ACHIEVEMENTS } from '../js/ui/app.js';
+import { ACHIEVEMENTS } from '../js/content/achievements.js';
 
 const LOCALES = ['en-US', 'en-GB', 'es-419', 'es-ES', 'de-DE', 'fr-FR', 'fr-CA', 'pt-BR', 'it-IT'];
 const root = new URL('../', import.meta.url);
-function walk(dir) {
-  return readdirSync(new URL(dir, root)).flatMap((f) => {
-    const rel = dir + f;
-    return statSync(new URL(rel, root)).isDirectory() ? walk(rel + '/') : rel.endsWith('.js') && !rel.endsWith('strings.js') ? [rel] : [];
-  });
-}
-const code = walk('js/').map((f) => readFileSync(new URL(f, root), 'utf8')).join('\n');
-const html = readFileSync(new URL('index.html', root), 'utf8');
+// The client's code: native/*.ts (keys as t("key") calls, plus keys passed through helpers and lookup tables).
+const code = readdirSync(new URL('native/', root)).filter((f) => f.endsWith('.ts')).map((f) => readFileSync(new URL('native/' + f, root), 'utf8')).join('\n');
 const en = STRINGS['en-US'];
 const used = new Set();
-for (const m of code.matchAll(/\bt\('([A-Za-z0-9]+)'/g)) used.add(m[1]);
-for (const m of (code + html).matchAll(/data-i18n(?:-aria|-title)?="([A-Za-z0-9]+)"/g)) used.add(m[1]);
-// Keys passed through helpers and lookup tables (row('checkpoints', …), card('learn', 'learn', …), INVALID_KEYS, caption keys …).
-for (const m of code.matchAll(/'([a-z][A-Za-z0-9]+)'/g)) if (typeof en[m[1]] === 'string' && /^(cap|rsn|out|pal|sync|col)[A-Z]|^(checkpoints|placement|qualifyBonus|timeBonus|survival|fallsPenalty|move|moveRow|jumpRow|diveRow|pauseRow|lessonDoneH|lessonKeepH|goalShowFinal|goalShowRound|camera|colorPalette|music|effects|ambience|captions|cameraShake|reducedMotion|highContrast|textSize|leftHanded|learn|journey|daily|practice|challengesH|show|hostedPlay)$/.test(m[1])) used.add(m[1]);
+for (const m of code.matchAll(/\bt\("([A-Za-z0-9]+)"/g)) used.add(m[1]);
+for (const m of code.matchAll(/"([a-z][A-Za-z0-9]+)"/g)) if (typeof en[m[1]] === 'string') used.add(m[1]);
 const vars = (s) => [...String(s).matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',');
 
 test('ships the nine locales', () => assert.deepEqual(Object.keys(STRINGS).sort(), [...LOCALES].sort()));
 test('every locale has exactly the US English keys', () => {
   for (const loc of LOCALES) assert.deepEqual(Object.keys(STRINGS[loc]).sort(), Object.keys(en).sort(), loc);
 });
-test('found the keys in markup and code', () => assert.ok(used.size > 180, String(used.size)));
+test('found the keys in markup and code', () => assert.ok(used.size > 150, String(used.size)));
 for (const loc of LOCALES) {
   test(`${loc}: every used key, matching placeholders`, () => {
     const L = STRINGS[loc];

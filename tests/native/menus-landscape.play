@@ -1,0 +1,71 @@
+# Short landscape phone (844 x 390 at DPR 3), by finger: the Daily (its course
+# validated on the worker) played to its results by keys, then a challenge with
+# its pause menu, Settings and Help, Leave round; Practice started and left.
+# viewport 844x390@3
+until 600 Tumble
+frames 30
+save tc-land-title
+touch Daily challenge
+until 900 =GO!
+frames 2
+hold KeyW
+repeat 9000 until Score breakdown
+key Space 1
+frames 0
+key ShiftLeft 1
+frames 1
+end
+release KeyW
+frames 30
+expect Daily challenge —
+save tc-land-results
+touch Mode select
+until 300 Choose a mode
+frames 10
+touch Challenges
+until 300 Feet on the Ground
+frames 10
+touch Feet on the Ground
+until 400 =GO!
+frames 60
+save tc-land-race
+key Escape 1
+until 300 Retry round
+frames 10
+save tc-land-pause
+touch =Settings
+until 300 Open Options
+frames 10
+save tc-land-settings
+touch Camera shake
+frames 10
+touch Done
+until 300 Retry round
+frames 10
+touch =Help
+until 300 How to play
+frames 10
+save tc-land-help
+touch Done
+until 300 Retry round
+frames 10
+touch Leave round
+until 300 Choose a mode
+frames 10
+touch Practice
+until 300 Unranked. Restart
+frames 10
+save tc-land-practice
+touch Start
+until 400 =GO!
+frames 30
+touch =Pause
+until 300 Resume
+frames 10
+touch Resume
+frames 30
+key Escape 1
+until 300 Leave round
+frames 10
+touch Leave round
+until 300 Choose a mode

@@ -1,0 +1,96 @@
+/* Tumble Circuit — the browser build's css/main.css rewritten class-based for
+   the engine's UI (`npm run css` converts it into assets/ui-style.json).
+   Element selectors, ids, body classes and @media do not convert: every
+   widget names its classes, the breakpoints are layouts picked in
+   native/screens.ts, high contrast is a token set native/style.ts applies,
+   larger text is the runtime's text scale. Translucent panels keep the old
+   rgba colours (the backdrop blur is left out). */
+
+:root {
+  --accent: #ffd166; --panel: rgba(16, 22, 40, 0.86); --panel-solid: #101628; --text: #f2f6ff; --text-dim: #b8c4de;
+  --danger: #ef476f; --ok: #06d6a0; --focus: #8fb8ff; --dark: #20263a;
+  --btn: rgba(255, 255, 255, 0.08); --btn-hover: rgba(255, 255, 255, 0.16); --btn-edge: rgba(255, 255, 255, 0.22);
+  --card: rgba(255, 255, 255, 0.07); --card-edge: rgba(255, 255, 255, 0.14);
+}
+* { box-sizing: border-box; }
+
+/* text */
+.text { color: var(--text); font-size: 16px; }
+.dim { color: var(--text-dim); font-size: 16px; }
+.small { color: var(--text-dim); font-size: 13.6px; }
+.h1 { color: var(--text); font-size: 28.8px; font-weight: 700; }
+.h2 { color: var(--accent); font-size: 18.4px; font-weight: 700; }
+.logo { color: var(--text); font-size: 48px; font-weight: 800; }
+.logo-em { color: var(--accent); font-size: 48px; font-weight: 800; }
+.logo-s { color: var(--text); font-size: 35.2px; font-weight: 800; }
+.logo-em-s { color: var(--accent); font-size: 35.2px; font-weight: 800; }
+.hud-title { color: var(--text); font-size: 16px; font-weight: 700; }
+.hud-goal { color: var(--text-dim); font-size: 13.6px; }
+.hud-clock { color: var(--text); font-size: 24px; font-weight: 700; }
+.hud-place { color: var(--accent); font-size: 14.4px; font-weight: 600; }
+.hud-quota { color: var(--text-dim); font-size: 12.8px; }
+.banner-text { color: var(--text); font-size: 16.8px; }
+.countdown { color: var(--accent); font-size: 144px; font-weight: 800; }
+.countdown-s { color: var(--accent); font-size: 72px; font-weight: 800; }
+.caption { color: #ffffff; font-size: 14.4px; }
+.toast-text { color: var(--text); font-size: 16px; text-align: center; }
+.card-title { color: var(--text); font-size: 16px; font-weight: 700; }
+.card-sub { color: var(--text-dim); font-size: 12.8px; }
+.td { color: var(--text); font-size: 16px; }
+.td-num { color: var(--text); font-size: 16px; text-align: end; }
+.td-you { color: var(--accent); font-size: 16px; font-weight: 700; }
+.td-you-num { color: var(--accent); font-size: 16px; font-weight: 700; text-align: end; }
+.th { color: var(--text); font-size: 16px; font-weight: 700; }
+.th-num { color: var(--text); font-size: 16px; font-weight: 700; text-align: end; }
+.qual { color: var(--ok); font-size: 16px; }
+.wrap { color: var(--text); font-size: 16px; text-align: center; }
+.wrap-dark { color: var(--dark); font-size: 18.4px; font-weight: 700; text-align: center; }
+.thinking { color: var(--accent); font-size: 14.4px; }
+
+/* surfaces */
+.hud-box { background: rgba(16, 22, 40, 0.86); border-radius: 12px; padding: 8px 14px; }
+.hud-box-s { background: rgba(16, 22, 40, 0.86); border-radius: 12px; padding: 5px 10px; }
+.hud-box-hc { background: rgba(0, 0, 0, 0.94); border: 2px solid #ffffff; border-radius: 12px; padding: 8px 14px; }
+.banner { background: rgba(16, 22, 40, 0.86); border-left: 4px solid var(--accent); border-radius: 10px; padding: 10px 18px; }
+.panel { background: rgba(16, 22, 40, 0.86); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 18px; padding: 24px 28px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.5); }
+.panel-hc { background: rgba(0, 0, 0, 0.94); border: 2px solid #ffffff; border-radius: 18px; padding: 24px 28px; }
+.caption-box { background: rgba(0, 0, 0, 0.7); border-radius: 8px; padding: 4px 12px; }
+.toast { background: var(--panel-solid); border: 1px solid var(--accent); border-radius: 10px; padding: 10px 16px; }
+.bar { background: rgba(255, 255, 255, 0.15); border-radius: 5px; }
+.bar-fill { background: var(--ok); border-radius: 5px; }
+.tr { border-radius: 0; padding: 4px 8px; }
+.tr-head { border-radius: 0; padding: 4px 8px; }
+
+/* buttons */
+.btn { min-height: 44px; min-width: 44px; padding: 8.8px 17.6px; background: var(--btn); border: 2px solid var(--btn-edge);
+  border-radius: 12px; color: var(--text); font-size: 16px; text-align: center; }
+.btn:hover { background: var(--btn-hover); }
+.btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.btn:disabled { opacity: 0.45; }
+.btn-primary { min-height: 44px; min-width: 44px; padding: 12.9px 29.4px; background: var(--accent); border: 2px solid #c89a2e;
+  border-radius: 12px; color: var(--dark); font-size: 18.4px; font-weight: 700; text-align: center; }
+.btn-primary:hover { background: #ffe08f; }
+.btn-primary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.btn-danger { min-height: 44px; min-width: 44px; padding: 8.8px 17.6px; background: var(--btn); border: 2px solid var(--danger);
+  border-radius: 12px; color: #ffb3c6; font-size: 16px; text-align: center; }
+.btn-danger:hover { background: var(--btn-hover); }
+.btn-danger:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.btn-icon { min-height: 44px; min-width: 44px; padding: 4.8px 11.2px; background: rgba(16, 22, 40, 0.86); border: 2px solid var(--btn-edge);
+  border-radius: 12px; color: var(--text); font-size: 16px; font-weight: 700; text-align: center; }
+.btn-icon:hover { background: var(--btn-hover); }
+.btn-icon:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.card { min-height: 44px; padding: 12px; background: var(--card); border: 1px solid var(--card-edge); border-radius: 12px;
+  color: var(--text); font-size: 16px; text-align: start; }
+.card:hover { background: rgba(255, 255, 255, 0.14); }
+.card:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.card:disabled { opacity: 0.45; }
+.card-done { min-height: 44px; padding: 12px; background: var(--card); border: 1px solid var(--ok); border-radius: 12px;
+  color: var(--text); font-size: 16px; text-align: start; }
+.card-done:hover { background: rgba(255, 255, 255, 0.14); }
+.card-done:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.card-mastery { min-height: 44px; padding: 12px; background: var(--card); border: 1px solid var(--accent); border-radius: 12px;
+  color: var(--text); font-size: 16px; text-align: start; }
+.card-mastery:hover { background: rgba(255, 255, 255, 0.14); }
+.card-mastery:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.card-mastery:disabled { opacity: 0.45; }
