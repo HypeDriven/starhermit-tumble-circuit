@@ -1,6 +1,6 @@
 # Tumble Circuit — Product and Game Specification
 
-**Document status:** running specification of the game as shipped on the StarHermit engine (1.24.0, host API minor 23).  
+**Document status:** running specification of the game as shipped on the StarHermit engine (1.27.0, host API minor 29).  
 **Game index:** 100  
 **Genre:** Realtime obstacle race  
 **Players:** 2–32 players as specified by playlist  
@@ -118,7 +118,7 @@ The subject is the active playfield at near-tabletop to room scale, framed so st
 
 The arena is drawn on `starhermit:scene`, a port of the browser build's three.js r160 `js/render/scene.js`: the gradient sky dome (a WGSL `ShaderMaterial`; sun glow and drifting high haze when detailed), exponential fog, a hemisphere fill and the key sun whose PCF shadow box (bias −0.0004, normal bias 0.03) is fitted around the followed racer and snapped to whole texels; platform slabs (tiled tops, striped sides, raised rim trim), the finish pad, arena discs, movers with lane hints, spinners, pendulums, pistons, bumpers, weave walls, bounce pads, conveyor arrows, fan streams, checkpoint rings and the chequered finish gate; decor (jittered rock islands, cumulus clouds, stars, balloons, kites, aurora ribbons, light motes); racers (capsule body, face marker, grounded ring, name sprite) with squash and stretch; burst particles; the critically damped follow camera (Follow or Far) with optional shake; the title backdrop pans over Ridge Run. Engine minor 23 follows three r155+ light units and three's shadows, so the page's own light intensities and shadow values are used unchanged. Reflections use a `RoomEnvironment(renderer)` PMREM (sigma 0.04) given to each lit material as its own `envMap` at the old per-material `envMapIntensity` (r160 applied those to the scene environment; the engine, like r163+, does not); with reflections the hemisphere fill halves, as before. ACES tone mapping, exposure 1.05.
 
-Post effects are the runtime's: GTAO (`renderer.ao`), bloom, a display-space colour grade with vignette and SMAA / FXAA / MSAA. **Difference:** the old bloom read a glow-only render (rings, gate, pads, sparkles, motes); the runtime's bloom has no per-object mask, so its threshold (1.25) sits above sunlit platforms instead.
+Post effects are the runtime's: GTAO (`renderer.ao`), bloom, a display-space colour grade with vignette and SMAA / FXAA / MSAA. **Difference:** the old bloom read a glow-only render (rings, gate, pads, sparkles, motes); the runtime's bloom has no per-object mask, so its threshold (1.25) sits above sunlit platforms instead; at minor 29 (r185 bloom) the page's r160 strength 0.4 is squared to 0.16.
 
 ### Graphics tiers (native/quality.ts)
 
@@ -130,7 +130,7 @@ The authored one-shots (`sfx/*.opus`) per game event, the 2 s low-passed noise a
 
 ## 5. Technical architecture
 
-- `starhermit.txt`: `engine.entry=native/main.ts`, `engine.version=1.24.0`, `engine.minor=23`, capabilities `platform,storage,clipboard`; actions `left right forward back jump dive pause` with keyboard and gamepad defaults (left stick / D-pad run, South jumps, East/West dive, Start pauses).
+- `starhermit.txt`: `engine.entry=native/main.ts`, `engine.version=1.27.0`, `engine.minor=29`, capabilities `platform,storage,clipboard`; actions `left right forward back jump dive pause` with keyboard and gamepad defaults (left stick / D-pad run, South jumps, East/West dive, Start pauses).
 - `js/rules`, `js/content`, `js/session/round.js`, `js/rules/show.js`, `js/platform/store.js`: the browser build's pure modules, shared with the node tests (only change: a JSON clone instead of `structuredClone` in `daily.js`).
 - `native/main.ts`: round lifecycle — one 60 Hz rules tick per fixed step (deterministic), the 3-2-1 countdown, input sampled into the round each step, pause / resume / retry / leave, lessons, Journey, Daily, Practice, Challenges, Shows, results, achievements, leaderboard posting, announcements.
 - `native/work.ts` + `native/work-worker.js`: a `starhermit:script` worker for the Daily's validated course (the offline probe bot, up to eight candidates) and the results screen's replay check (the round re-simulated); the panel shows "Preparing today's course…" / "Replay integrity: checking…" meanwhile. Without a worker the job runs on the game thread.

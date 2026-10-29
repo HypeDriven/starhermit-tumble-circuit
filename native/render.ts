@@ -121,7 +121,8 @@ export function applyLook(l: Look): void {
     resolution: l.budget.aoRes,
     denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: l.ao === "high" ? 6 : 4, rings: 2, samples: l.ao === "high" ? 16 : 8, radiusExponent: 2 },
   };
-  renderer.bloom = l.bloom ? { strength: 0.4, radius: 0.25, threshold: 1.25, resolution: l.budget.bloomRes } : null;
+  // r160 page bloom 0.4, squared for the r185 UnrealBloom of minor 29
+  renderer.bloom = l.bloom ? { strength: 0.16, radius: 0.25, threshold: 1.25, resolution: l.budget.bloomRes } : null;
   renderer.grade = l.grade ? {
     space: "display", amount: 1, contrast: 0.11, saturation: 1.1,
     shadows: [0.97, 0.98, 1.04], highlights: [1.03, 1.0, 0.97], split: [0.25, 0.85],
