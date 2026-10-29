@@ -1,6 +1,6 @@
 # Tumble Circuit — Product and Game Specification
 
-**Document status:** running specification of the game as shipped on the StarHermit engine (1.23.0, host API minor 23).  
+**Document status:** running specification of the game as shipped on the StarHermit engine (1.24.0, host API minor 23).  
 **Game index:** 100  
 **Genre:** Realtime obstacle race  
 **Players:** 2–32 players as specified by playlist  
@@ -130,7 +130,7 @@ The authored one-shots (`sfx/*.opus`) per game event, the 2 s low-passed noise a
 
 ## 5. Technical architecture
 
-- `starhermit.txt`: `engine.entry=native/main.ts`, `engine.version=1.23.0`, `engine.minor=23`, capabilities `platform,storage,clipboard`; actions `left right forward back jump dive pause` with keyboard and gamepad defaults (left stick / D-pad run, South jumps, East/West dive, Start pauses).
+- `starhermit.txt`: `engine.entry=native/main.ts`, `engine.version=1.24.0`, `engine.minor=23`, capabilities `platform,storage,clipboard`; actions `left right forward back jump dive pause` with keyboard and gamepad defaults (left stick / D-pad run, South jumps, East/West dive, Start pauses).
 - `js/rules`, `js/content`, `js/session/round.js`, `js/rules/show.js`, `js/platform/store.js`: the browser build's pure modules, shared with the node tests (only change: a JSON clone instead of `structuredClone` in `daily.js`).
 - `native/main.ts`: round lifecycle — one 60 Hz rules tick per fixed step (deterministic), the 3-2-1 countdown, input sampled into the round each step, pause / resume / retry / leave, lessons, Journey, Daily, Practice, Challenges, Shows, results, achievements, leaderboard posting, announcements.
 - `native/work.ts` + `native/work-worker.js`: a `starhermit:script` worker for the Daily's validated course (the offline probe bot, up to eight candidates) and the results screen's replay check (the round re-simulated); the panel shows "Preparing today's course…" / "Replay integrity: checking…" meanwhile. Without a worker the job runs on the game thread.

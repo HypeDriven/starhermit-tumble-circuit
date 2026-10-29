@@ -1,6 +1,6 @@
 // Plans the key rhythms the play scripts use to win rounds, with the real
 // round driver (js/session/round.js) and the play scripts' measured timing on
-// engine 1.23.0 at minor 23 (render checks run one fixed step a frame):
+// engine 1.24.0 at minor 23 (render checks run one fixed step a frame):
 //
 //   until =GO!          matches on the frame of the round's first active tick
 //   frames F            (F = 0..)
