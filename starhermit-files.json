@@ -55,7 +55,7 @@
     "sfx/round-end-sting.opus": {"sha256": "469e5ce6595744ce34573c20d8acce66081fc672a998b7ed9d203a174e6ff594", "size": 28318},
     "sfx/ui-back.opus": {"sha256": "1abaad293cf01d9901dff1fd7041532ff7ef49da2985ef2886c105c6d5d60855", "size": 12658},
     "sfx/ui-click.opus": {"sha256": "20187ec4652702e3f6d8bf6fa7c3f0b3125855758397b2d790ed1469f4be0824", "size": 14513},
-    "starhermit.txt": {"sha256": "238bc2d6a0d437df74c4cf12acf06c8b2f69ccdd39eb4bafbb075f618d8b35b7", "size": 1759}
+    "starhermit.txt": {"sha256": "7cb42c7efb19c03cbc5bcf97b11bd1c4b6bea14fe03b36ee5297a9ea85fcc221", "size": 1759}
   },
   "excluded": ["LICENSE.md", "coverart.png", "node_modules/", "package-lock.json", "package.json", "sfx/manifest.json", "sfx/manifest.md", "spec.md", "tests/", "tools/", "tsconfig.json"],
   "format": 1
