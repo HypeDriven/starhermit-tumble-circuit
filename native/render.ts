@@ -64,6 +64,7 @@ function environment(): Texture | null {
     try {
       // r160 page: new RoomEnvironment(renderer), sigma 0.04
       const room = new RoomEnvironment(renderer);
+      room.position.y = 0; // the page's three r160 (pre-r183) builds the room at the origin
       envTex = new PMREMGenerator(renderer).fromScene(room, 0.04).texture;
     } catch (e) { console.warn(`environment: ${String(e)}`); }
   }
