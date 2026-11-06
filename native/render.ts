@@ -117,13 +117,14 @@ export function applyLook(l: Look): void {
   look = l;
   renderer.shadowMap.enabled = l.shadows > 0;
   renderer.antialias = l.antialias;
-  renderer.ao = l.ao === "off" ? null : {
-    blendIntensity: 0.7, radius: 0.9, distanceExponent: 1.5, thickness: 1.5, scale: 1, samples: l.ao === "high" ? 16 : 8,
-    resolution: l.budget.aoRes,
-    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: l.ao === "high" ? 6 : 4, rings: 2, samples: l.ao === "high" ? 16 : 8, radiusExponent: 2 },
+  const ao = l.ao, hi = !!ao && ao.resolution >= 1; // the engine's "high": full-resolution AO
+  renderer.ao = !ao ? null : {
+    blendIntensity: 0.7, radius: 0.9, distanceExponent: 1.5, thickness: 1.5, scale: 1, samples: ao.samples,
+    resolution: ao.resolution,
+    denoise: { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: hi ? 6 : 4, rings: 2, samples: ao.denoiseSamples, radiusExponent: 2 },
   };
   // r160 page: r160 UnrealBloom at the page's strength
-  renderer.bloom = l.bloom ? { model: "r160", strength: 0.4, radius: 0.25, threshold: 1.25, resolution: l.budget.bloomRes } : null;
+  renderer.bloom = l.bloom === null ? null : { model: "r160", strength: 0.4, radius: 0.25, threshold: 1.25, resolution: l.bloom };
   renderer.grade = l.grade ? {
     space: "display", contrastCurve: "s", amount: 1, contrast: 0.22, saturation: 1.1,
     shadows: [0.97, 0.98, 1.04], highlights: [1.03, 1.0, 0.97], split: [0.25, 0.85],
@@ -352,7 +353,7 @@ export function buildCourse(c: Any, tId: string): void {
   sun.shadow.bias = -0.0004;
   sun.shadow.normalBias = 0.03;
   sun.castShadow = shadows;
-  if (shadows) sun.shadow.mapSize = look.shadows;
+  if (shadows) sun.shadow.mapSize = look.shadows; // the level's size: at minor 23+ the engine keeps what the game sets
   fitShadow(0, 10);
   scene.add(sun);
   scene.add(sun.target);

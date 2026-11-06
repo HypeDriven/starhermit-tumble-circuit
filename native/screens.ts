@@ -25,11 +25,9 @@ import {
 // ------------------------------------------------------------------ layout helpers
 interface Layout { lw: number; lh: number; sc: number; narrow: boolean; short: boolean; ox: number; oy: number }
 function layoutNow(): Layout {
-  const f = frame();
-  const sc = ui.preferences().scale;
-  const sa = f.safeArea;
-  const lw = Math.max(1, (f.width - sa.left - sa.right) / sc), lh = Math.max(1, (f.height - sa.top - sa.bottom) / sc);
-  return { lw, lh, sc, narrow: lw <= 700, short: lh <= 480 && lw > lh, ox: sa.left, oy: sa.top };
+  const v = ui.viewport!();
+  const lw = Math.max(1, v.width), lh = Math.max(1, v.height);
+  return { lw, lh, sc: v.scale, narrow: lw <= 700, short: lh <= 480 && lw > lh, ox: v.x, oy: v.y };
 }
 const lastSize = new Map<string, ui.Rect>();
 function textWidth(text: string, style: string, kind?: "button" | "heading"): number {
@@ -58,18 +56,9 @@ function button(b: Btn): void {
 }
 /** Buttons at their own widths in rows that wrap at `width` (.row flex-wrap). */
 function flow(label: string, list: Btn[], width: number, justify: "start" | "center" = "start", gap = 10): void {
-  const rows: Btn[][] = [[]];
-  let used = 0;
-  const bw = (b: Btn): number => Math.min(width, b.width ?? btnWidth(b));
-  for (const b of list) {
-    const w = bw(b);
-    if (rows[rows.length - 1]!.length && used + gap + w > width) { rows.push([]); used = 0; }
-    used += (rows[rows.length - 1]!.length ? gap : 0) + w;
-    rows[rows.length - 1]!.push(b);
-  }
-  ui.column(label, () => {
-    rows.forEach((row, ri) => ui.row(`${label}-r${ri}`, () => { for (const b of row) button({ ...b, width: bw(b) }); }, { spacing: gap, width, justify, align: "center" }));
-  }, { spacing: gap, width });
+  ui.row(label, () => {
+    for (const b of list) button(b.width != null ? { ...b, width: Math.min(width, b.width) } : btnWidth(b) > width ? { ...b, width } : b);
+  }, { wrap: true, width, gap, justify, align: "center" });
 }
 /** .card-grid: auto-fill columns of at least `min` px. */
 function grid(id: string, n: number, w: number, min: number, cell: (i: number, cw: number) => void, gap = 10): void {
@@ -101,12 +90,6 @@ export function drawScreens(): void {
   }
   if (app.caption) {
     ui.place("captions", { anchor: "bottom", y: 120 }, () => ui.column("caption-box", () => ui.style("caption").label(app.caption!.text), { style: "caption-box" }));
-  }
-  if (app.toast) {
-    const w = Math.min(L0.lw - 32, 520);
-    ui.place("toast", { anchor: "bottom", y: 24 }, () => {
-      ui.column("toast-box", () => para(app.toast!.text, Math.min(textWidth(app.toast!.text, "toast-text") + 1, w - 34), "toast-text", "toast-text"), { style: "toast" });
-    });
   }
   overlay(L0);
   if (app.focusNext) {
@@ -515,7 +498,7 @@ function resultsPanel(w: number): void {
       };
     }),
   ], w);
-  for (const key of spec.newly) para(t("achievementUnlocked", { name: tn<string[]>("achievements", key, [ACHIEVEMENTS[key]!.name])[0]! }), w, "hud-place", `ach-${key}`);
+  for (const key of spec.newly) para(t("achievementUnlocked", { name: tn("achievements", `${key}.0`, ACHIEVEMENTS[key]!.name) }), w, "hud-place", `ach-${key}`);
   if (spec.lb) para(spec.lb(), w, "text", "results-lb");
   const seed = r.def.seed;
   para(spec.replay ? (spec.replay.ok ? t("replayOk", { seed }) : t("replayBad", { reason: spec.replay.reason ?? "", seed })) : t("checkingReplay"), w, "small", "replay-line");

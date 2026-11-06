@@ -1,0 +1,77 @@
+# The Quick Show's first round: ten racers, the local one running and jumping (bursts, camera), for tools/engine-tier-bench.mjs.
+# viewport 1280x800@1
+until 600 Tumble
+frames 30
+click Play
+until 300 Choose a mode
+frames 10
+click Show
+until 300 Survive each cut
+frames 10
+click Quick Show
+until 400 =GO!
+frames 2
+measure start
+hold KeyW
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+key Space 1
+frames 20
+release KeyW
+measure stop

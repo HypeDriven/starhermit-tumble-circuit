@@ -1,5 +1,5 @@
 // The static achievement set (English names/descriptions; the shown text comes
-// from strings.js's achievements group). Keys are stable lowercase ids.
+// from assets/strings.json's achievements.* keys). Keys are stable lowercase ids.
 export const ACHIEVEMENTS = {
   first_finish: { name: 'First Crossing', desc: 'Finish your first course.' },
   lesson_grad: { name: 'Graduate', desc: 'Complete all five lessons.' },

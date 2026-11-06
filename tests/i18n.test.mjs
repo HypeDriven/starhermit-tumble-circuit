@@ -6,12 +6,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { STRINGS } from '../js/ui/strings.js';
 import { JOURNEY, LESSONS, CHALLENGES, SHOWS, ARENAS, SHOW_COURSES } from '../js/content/stages.js';
 import { ACHIEVEMENTS } from '../js/content/achievements.js';
 
 const LOCALES = ['en-US', 'en-GB', 'es-419', 'es-ES', 'de-DE', 'fr-FR', 'fr-CA', 'pt-BR', 'it-IT'];
 const root = new URL('../', import.meta.url);
+const STRINGS = JSON.parse(readFileSync(new URL('assets/strings.json', root), 'utf8'));
 // The client's code: native/*.ts (keys as t("key") calls, plus keys passed through helpers and lookup tables).
 const code = readdirSync(new URL('native/', root)).filter((f) => f.endsWith('.ts')).map((f) => readFileSync(new URL('native/' + f, root), 'utf8')).join('\n');
 const en = STRINGS['en-US'];
@@ -33,29 +33,29 @@ for (const loc of LOCALES) {
   });
   test(`${loc}: every content name`, () => {
     const L = STRINGS[loc];
-    for (const s of JOURNEY) assert.ok(L.stages[s.id], `stage ${s.id}`);
-    for (const id of new Set(JOURNEY.map((s) => s.theme))) assert.ok(L.themes[id], `theme ${id}`);
-    for (const a of ARENAS) assert.ok(L.arenas[a.id], `arena ${a.id}`);
-    for (const c of SHOW_COURSES) assert.ok(L.showCourses[c.id], `show course ${c.id}`);
-    for (const s of SHOWS) assert.ok(L.shows[s.id], `show ${s.id}`);
+    for (const s of JOURNEY) assert.ok(L[`stages.${s.id}`], `stage ${s.id}`);
+    for (const id of new Set(JOURNEY.map((s) => s.theme))) assert.ok(L[`themes.${id}`], `theme ${id}`);
+    for (const a of ARENAS) assert.ok(L[`arenas.${a.id}`], `arena ${a.id}`);
+    for (const c of SHOW_COURSES) assert.ok(L[`showCourses.${c.id}`], `show course ${c.id}`);
+    for (const s of SHOWS) assert.ok(L[`shows.${s.id}`], `show ${s.id}`);
     for (const l of LESSONS) {
-      assert.ok(L.lessons[l.id] && L.lessonText[l.id], `lesson ${l.id}`);
-      for (const st of l.steps) assert.equal(vars(L.lessonText[l.id + '.' + st.id]), vars(st.text), `step ${l.id}.${st.id}`);
+      assert.ok(L[`lessons.${l.id}`] && L[`lessonText.${l.id}`], `lesson ${l.id}`);
+      for (const st of l.steps) assert.equal(vars(L[`lessonText.${l.id}.${st.id}`]), vars(st.text), `step ${l.id}.${st.id}`);
     }
-    for (const c of CHALLENGES) assert.ok(L.challenges[c.id] && L.challengeDesc[c.id], `challenge ${c.id}`);
-    for (const s of JOURNEY) for (const m of s.mechanics) assert.ok(L.mechanics[m], `mechanic ${m}`);
-    for (const k of Object.keys(ACHIEVEMENTS)) assert.equal(L.achievements[k]?.length, 2, `achievement ${k}`);
+    for (const c of CHALLENGES) assert.ok(L[`challenges.${c.id}`] && L[`challengeDesc.${c.id}`], `challenge ${c.id}`);
+    for (const s of JOURNEY) for (const m of s.mechanics) assert.ok(L[`mechanics.${m}`], `mechanic ${m}`);
+    for (const k of Object.keys(ACHIEVEMENTS)) assert.ok(L[`achievements.${k}.0`] && L[`achievements.${k}.1`], `achievement ${k}`);
   });
 }
 test('English content strings match the authored data', () => {
-  for (const s of JOURNEY) assert.equal(en.stages[s.id], s.name);
+  for (const s of JOURNEY) assert.equal(en[`stages.${s.id}`], s.name);
   for (const l of LESSONS) {
-    assert.equal(en.lessons[l.id], l.title);
-    assert.equal(en.lessonText[l.id], l.intro);
-    for (const st of l.steps) assert.equal(en.lessonText[l.id + '.' + st.id], st.text);
+    assert.equal(en[`lessons.${l.id}`], l.title);
+    assert.equal(en[`lessonText.${l.id}`], l.intro);
+    for (const st of l.steps) assert.equal(en[`lessonText.${l.id}.${st.id}`], st.text);
   }
-  for (const c of CHALLENGES) assert.deepEqual([en.challenges[c.id], en.challengeDesc[c.id]], [c.name, c.desc]);
-  for (const [k, a] of Object.entries(ACHIEVEMENTS)) assert.deepEqual(en.achievements[k], [a.name, a.desc]);
+  for (const c of CHALLENGES) assert.deepEqual([en[`challenges.${c.id}`], en[`challengeDesc.${c.id}`]], [c.name, c.desc]);
+  for (const [k, a] of Object.entries(ACHIEVEMENTS)) assert.deepEqual([en[`achievements.${k}.0`], en[`achievements.${k}.1`]], [a.name, a.desc]);
 });
 test('non-English locales are translated', () => {
   for (const loc of LOCALES.filter((l) => !l.startsWith('en'))) {

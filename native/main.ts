@@ -11,7 +11,7 @@
 // announcements and captions, and the lifecycle (a hidden window pauses the
 // round). Screens are drawn by screens.ts (starhermit:ui), the arena by
 // render.ts (starhermit:scene).
-import { clipboard, frame, onFixedUpdate, onPreferencesChange, onRender, onResume, onStart, onSuspend, onUpdate, preferences, setFixedRate } from "starhermit:engine";
+import { afterRender, clipboard, frame, levelSettings, onFixedUpdate, onPreferencesChange, onRender, onResume, onStart, onSuspend, onUpdate, preferences, setFixedRate } from "starhermit:engine";
 import { bindings, isDown, onAction, setTouchControls, touchControlsVisible, value } from "starhermit:input";
 import * as ui from "starhermit:ui";
 import { onSessionEnded, requestSignIn } from "starhermit:platform";
@@ -66,7 +66,6 @@ export const app = {
   showOver: null as ShowOver | null,
   returnTo: "title" as "title" | "pause",
   practice: { course: 0, skill: 1, bots: 2 },
-  toast: null as { text: string; until: number } | null,
   caption: null as { text: string; until: number } | null,
   countdown: null as string | null,
   countHide: 0,
@@ -93,16 +92,15 @@ function flushAnnouncements(): void {
   try { ui.announce(text, { politeness: spokenAssertive ? "assertive" : "polite" }); } catch { /* busy */ }
   spokenAssertive = false;
 }
-export function toast(text: string, ms = 3500): void { app.toast = { text, until: now() + ms / 1000 }; announce(text); }
+export function toast(text: string, ms = 3500): void { ui.toast!(text, { duration: ms / 1000, style: ["toast", "toast-text"], dismissible: false }); }
 /** audio.js event with its caption (#captions, 1.4 s, when captions are on). */
 export function sound(ev: string): void {
   audio.play(ev);
   const c = audio.CAPTIONS[ev];
   if (c && platform.options.captions) app.caption = { text: `♪ ${t(c)}`, until: now() + 1.4 };
 }
-const pending: (() => void)[] = [];
 /** A widget's press, run once the frame's UI is built. */
-export function later(fn: () => void): void { pending.push(fn); }
+export function later(fn: () => void): void { afterRender(fn); }
 
 const GLYPH: Record<string, string> = { "Arrow Up": "↑", "Arrow Down": "↓", "Arrow Left": "←", "Arrow Right": "→", Escape: "Esc", "Shift Left": "Shift", "Shift Right": "Right Shift" };
 /** app.js keysFor over the effective bindings (the runtime's rebinding). */
@@ -373,7 +371,7 @@ function showResults(): void {
       save.achievements[key] = Date.now();
       newly.push(key);
       sound("achievement");
-      announce(t("achievementUnlocked", { name: tn<string[]>("achievements", key, [ACHIEVEMENTS[key]!.name])[0]! }), true);
+      announce(t("achievementUnlocked", { name: tn("achievements", `${key}.0`, ACHIEVEMENTS[key]!.name) }), true);
     }
   };
   save.stats.races++;
@@ -436,9 +434,9 @@ function showResults(): void {
   const spec: ResultsSpec = { headline, me, res, next, replay: null, lb: null, newly };
   // Signed in only: every finished local round except lessons posts the total to the high-score board.
   if (platform.signedIn() && !r.lesson) {
-    spec.lb = () => pt("lbPosting");
+    spec.lb = () => pt("leaderboardPosting");
     void platform.postScore(Math.max(0, me.total)).then((p) => {
-      spec.lb = () => (!p.posted ? pt("lbFailed") : p.rank ? pt("lbRank", { rank: p.rank }) : pt("lbPosted"));
+      spec.lb = () => (!p.posted ? pt("leaderboardNotPosted") : p.rank ? pt("leaderboardRank", { rank: p.rank }) : pt("leaderboardPosted"));
       if (app.results === spec) announce(spec.lb());
     });
   }
@@ -455,7 +453,7 @@ export function signIn(): void { void requestSignIn().catch(() => undefined); }
 export function invite(): void {
   const link = platform.inviteLink();
   if (!link) return;
-  try { clipboard.writeText(link); toast(pt("inviteCopied")); } catch { toast(pt("inviteFailed", { link })); }
+  try { clipboard.writeText(link); toast(pt("inviteCopied")); } catch { toast(pt("inviteLink", { link })); }
 }
 
 // ------------------------------------------------------------------ input (keys, pads, the touch stick and buttons)
@@ -530,11 +528,10 @@ onFixedUpdate(() => {
 // ------------------------------------------------------------------ boot and lifecycle
 let lookKey = "";
 function applyLook(): void {
-  const f = frame();
-  const k = `${f.quality}:${f.levelIndex}`;
-  if (k === lookKey) return;
-  lookKey = k;
-  render.applyLook(lookFor(f.quality, f.levelIndex));
+  const level = frame().level;
+  if (level === lookKey) return;
+  lookKey = level;
+  render.applyLook(lookFor(levelSettings(level)));
 }
 function applyOptions(): void {
   const o = platform.options;
@@ -582,7 +579,6 @@ onUpdate((dt) => {
   applyTokens(ui.preferences().highContrast);
   audio.update();
   const n = now();
-  if (app.toast && app.toast.until < n) app.toast = null;
   if (app.caption && app.caption.until < n) app.caption = null;
   touchControls();
 });
@@ -591,7 +587,6 @@ onRender(() => {
   if (app.round) render.render(app.round.state, app.round.localId, frameDt, f.width, f.height);
   else if (attract) { attractT += frameDt; render.renderAttract(attractT, frameDt, f.width, f.height); }
   drawScreens();
-  for (const fn of pending.splice(0)) fn();
-  flushAnnouncements();
+  afterRender(flushAnnouncements); // queued after this frame's presses (later)
 });
 export { work };

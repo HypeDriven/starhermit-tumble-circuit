@@ -122,7 +122,7 @@ Post effects are the runtime's: GTAO (`renderer.ao`), bloom, a display-space col
 
 ### Graphics tiers (native/quality.ts)
 
-The runtime's quality tier picks the browser build's preset rows and budgets (`js/render/gfx.js`): Low (Lambert, no shadows, no post, MSAA, plain surfaces, static background), Balanced (Standard, 1024² shadows, bloom, grade, FXAA, reflections, detailed surfaces), High (Physical clear-coat, 2048², AO, SMAA), Ultra (4096², high AO, MSAA, 1.5× segments, 512 px textures). Burst sparks scale with the hardware level within a tier (≤ 2×). Auto, render scale, adaptive resolution, the frame-rate limit and readout are the runtime's Options; the old per-category overrides are not offered.
+The runtime's quality tier picks the browser build's preset rows and budgets (`js/render/gfx.js`): Low (Lambert, no shadows, no post, no anti-aliasing, plain surfaces, static background), Balanced (Standard, 1024² shadows, bloom, grade, FXAA, reflections, detailed surfaces), High (Physical clear-coat, 2048², AO, SMAA), Ultra (4096², high AO, MSAA, 1.5× segments, 512 px textures). Burst sparks scale with the hardware level within a tier (≤ 2×). Auto, render scale, adaptive resolution, the frame-rate limit and readout are the runtime's Options; the old per-category overrides are not offered.
 
 ### Audio (native/audio.ts)
 
@@ -138,7 +138,7 @@ The authored one-shots (`sfx/*.opus`) per game event, the 2 s low-passed noise a
 
 ### Localization
 
-All strings live in `js/ui/strings.js` (nine locales: en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT) and `js/ui/platformStrings.js`, in the runtime's interface language (Options › Language, else the account's or device's). A change shows on the next frame; the local racer's default name "You" and its name sprite relabel.
+All strings live in `assets/strings.json` on the engine's strings (nine locales: en-US, en-GB, es-419, es-ES, de-DE, fr-FR, fr-CA, pt-BR, it-IT; account lines are the engine's `starhermit.*`), in the runtime's interface language (Options › Language, else the account's or device's). A change shows on the next frame; the local racer's default name "You" and its name sprite relabel.
 
 ### Determinism and replay
 
