@@ -1,3 +1,7 @@
+import { localizedStyle as __l10nStyle } from "./l10n/font.ts";
+import { localizedDrawOptions as __l10nDrawOptions } from "./l10n/font.ts";
+// localization-runtime:attached
+import { openLocalizedOptions as __l10nOptions } from "./l10n/menu.ts";
 // The browser build's DOM shell (index.html + js/ui/app.js over
 // css/main.css) as starhermit:ui, built every frame over the arena: the HUD
 // (course and goal, the clock and place, the progress bar and cutoff, Pause),
@@ -8,7 +12,17 @@
 // layouts picked by the window's logical size (≤ 700 px wide: the HUD wraps,
 // the progress box takes its own row; ≤ 480 px tall landscape: the compact
 // HUD).
-import { frame, openMenu } from "starhermit:engine";
+// The browser build's DOM shell (index.html + js/ui/app.js over
+// css/main.css) as starhermit:ui, built every frame over the arena: the HUD
+// (course and goal, the clock and place, the progress bar and cutoff, Pause),
+// the lesson banner under it, the countdown, captions, the toast, a
+// "thinking" line while a worker job runs, and the screens (title, modes,
+// learn, journey, practice, challenges, show, pause, settings, help, results,
+// show over) as dialogs over the dimmed arena. The old media queries are
+// layouts picked by the window's logical size (≤ 700 px wide: the HUD wraps,
+// the progress box takes its own row; ≤ 480 px tall landscape: the compact
+// HUD).
+import { frame } from "starhermit:engine";
 import { primaryPointer, requestRebind, touchControlsVisible } from "starhermit:input";
 import * as draw from "starhermit:draw";
 import * as ui from "starhermit:ui";
@@ -36,7 +50,7 @@ function textWidth(text: string, style: string, kind?: "button" | "heading"): nu
 /** Text up to `width` wide: one label when it fits, else a paragraph. */
 function para(text: string, width: number, cls = "text", id?: string): void {
   if (!text) return;
-  let u = ui.style(cls);
+  let u = ui.style(__l10nStyle(cls));
   if (id) u = u.id(id);
   if (textWidth(text, cls) <= width) u.label(text);
   else u.paragraph(text, Math.max(20, width));
@@ -48,11 +62,11 @@ function button(b: Btn): void {
   const opts: ui.ButtonOptions = {};
   if (b.disabled) opts.disabled = true;
   if (b.width != null && btnWidth(b) > b.width) {
-    opts.content = () => { ui.style(style === "btn-primary" ? "wrap-dark" : "wrap").paragraph(b.text, Math.max(20, b.width! - 40)); };
+    opts.content = () => { ui.style(__l10nStyle(style === "btn-primary" ? "wrap-dark" : "wrap")).paragraph(b.text, Math.max(20, b.width! - 40)); };
   }
   const s: ui.Style = {};
   if (b.width != null) s.width = b.width;
-  if (ui.style(style, s).id(b.id).button(b.text, opts) && fresh()) later(() => { sound("ui"); b.act(); });
+  if (ui.style(__l10nStyle(style), __l10nStyle(s)).id(b.id).button(b.text, opts) && fresh()) later(() => { sound("ui"); b.act(); });
 }
 /** Buttons at their own widths in rows that wrap at `width` (.row flex-wrap). */
 function flow(label: string, list: Btn[], width: number, justify: "start" | "center" = "start", gap = 10): void {
@@ -73,7 +87,7 @@ function grid(id: string, n: number, w: number, min: number, cell: (i: number, c
 /** .card: a button whose face is a bold title over a dim sub line. */
 function card(id: string, title: string, sub: string, w: number, act: () => void, opts: { style?: string; disabled?: boolean } = {}): void {
   const iw = w - 26;
-  if (ui.style(opts.style ?? "card", { width: w }).id(id).button(`${title}, ${sub}`, {
+  if (ui.style(__l10nStyle(opts.style ?? "card"), __l10nStyle({ width: w })).id(id).button(`${title}, ${sub}`, {
     disabled: !!opts.disabled,
     content: () => ui.column(`${id}-c`, () => { para(title, iw, "card-title"); para(sub, iw, "card-sub"); }, { spacing: 2, width: iw }),
   }) && fresh()) later(() => { sound("ui"); act(); });
@@ -86,10 +100,10 @@ export function drawScreens(): void {
   const playing = !!r && app.flow === "round";
   if (r && (playing || app.flow === "results") && app.overlay !== "showOver") hud(L0);
   if (app.countdown && playing && !app.overlay) {
-    ui.place("countdown", { anchor: "center", x: 0, y: 0 }, () => ui.style(L0.narrow || L0.short ? "countdown-s" : "countdown").id("countdown-text").label(app.countdown!));
+    ui.place("countdown", { anchor: "center", x: 0, y: 0 }, () => ui.style(__l10nStyle(L0.narrow || L0.short ? "countdown-s" : "countdown")).id("countdown-text").label(app.countdown!));
   }
   if (app.caption) {
-    ui.place("captions", { anchor: "bottom", y: 120 }, () => ui.column("caption-box", () => ui.style("caption").label(app.caption!.text), { style: "caption-box" }));
+    ui.place("captions", { anchor: "bottom", y: 120 }, () => ui.column("caption-box", () => ui.style(__l10nStyle("caption")).label(app.caption!.text), { style: "caption-box" }));
   }
   overlay(L0);
   if (app.focusNext) {
@@ -137,8 +151,8 @@ function hud(L0: Layout): void {
   };
   const center = (): void => {
     ui.column("hud-center", () => {
-      ui.style("hud-clock").id("hud-clock").label(clock);
-      ui.style("hud-place").id("hud-place").label(place);
+      ui.style(__l10nStyle("hud-clock")).id("hud-clock").label(clock);
+      ui.style(__l10nStyle("hud-place")).id("hud-place").label(place);
     }, { style: box, width: centerW, spacing: 0, align: "center" });
   };
   const right = (w: number): void => {
@@ -151,11 +165,11 @@ function hud(L0: Layout): void {
           if (prog > 0) draw.roundRect(rc.x, rc.y, Math.max(rc.height, (rc.width * prog) / 100), rc.height, 5, token("ok"));
         },
       });
-      if (quota) ui.style("hud-quota").id("hud-quota").label(quota);
+      if (quota) ui.style(__l10nStyle("hud-quota")).id("hud-quota").label(quota);
     }, { style: box, width: w, spacing: 4 });
   };
   const pause = (): void => {
-    if (ui.style("btn-icon", { width: pauseW }).id("btn-pause").button(t("pause"), { content: () => ui.style("hud-title").label("II") }) && fresh()) {
+    if (ui.style(__l10nStyle("btn-icon"), __l10nStyle({ width: pauseW })).id("btn-pause").button(t("pause"), { content: () => ui.style(__l10nStyle("hud-title")).label("II") }) && fresh()) {
       later(() => (r.paused ? resumeRound() : pauseRound()));
     }
   };
@@ -297,7 +311,7 @@ function syncText(): string {
 function titlePanel(w: number, L0: Layout): void {
   const big = !L0.narrow && !L0.short;
   const a = big ? "logo" : "logo-s", b = big ? "logo-em" : "logo-em-s";
-  ui.row("title-logo", () => { ui.style(a).label("Tumble"); ui.style(b).label("Circuit"); }, { width: w, justify: "center", spacing: big ? 13 : 10 });
+  ui.row("title-logo", () => { ui.style(__l10nStyle(a)).label("Tumble"); ui.style(__l10nStyle(b)).label("Circuit"); }, { width: w, justify: "center", spacing: big ? 13 : 10 });
   ui.row("title-sub-row", () => para(t("tagline"), w, "dim", "title-sub"), { width: w, justify: "center" });
   ui.row("account-row", () => para(platform.signedIn() ? syncText() : t("guestLine"), w, "small", "account-line"), { width: w, justify: "center" });
   ui.column("title-gap", () => undefined, { height: 4 });
@@ -415,7 +429,7 @@ function toggleRow(id: string, label: string, on: boolean, w: number, set: (v: b
         const s = st.scale, box = 22 * s, bx = r.x + (r.width - box) / 2, by = r.y + (r.height - box) / 2;
         draw.roundRect(bx, by, box, box, 4, on ? token("accent") : "#1c2440");
         draw.strokeRoundRect(bx, by, box, box, 4, token("accent"), 2);
-        if (on) draw.text("✓", bx + box / 2, by + 1 * s, { size: 17 * s, color: token("dark"), align: "center", weight: "bold" });
+        if (on) draw.text("✓", bx + box / 2, by + 1 * s, __l10nDrawOptions({ size: 17 * s, color: token("dark"), align: "center", weight: "bold" }));
       },
     });
     if (res.activated && fresh()) later(() => { set(!on); sound("ui"); });
@@ -427,7 +441,7 @@ function settingsPanel(w: number): void {
   heading(t("settings"), w);
   para(t("optionsNote"), w, "dim", "options-note");
   flow("set-runtime", [
-    { id: "btn-options", text: t("openOptions"), act: () => openMenu() },
+    { id: "btn-options", text: t("openOptions"), act: () => __l10nOptions() },
     { id: "btn-rebind", text: t("keyBindings"), act: () => requestRebind() },
   ], w);
   para(t("audio"), w, "h2", "set-audio-h");

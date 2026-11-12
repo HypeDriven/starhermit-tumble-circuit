@@ -1,3 +1,5 @@
+// localization-runtime:attached
+import { setLocalizedDefaultFont as __l10nSetFont, setLocalizedStyles as __l10nStyles } from "./l10n/font.ts";
 // The look of the HUD, the banner, the countdown, captions, toasts and
 // screens: the browser build's css/main.css rewritten class-based in
 // tools/ui-style.css and converted with `starhermit css` into
@@ -17,7 +19,7 @@ let key = "";
 export let highContrast = false;
 export function initStyles(): void {
   css = files.readJson("assets/ui-style.json") as unknown as ui.CssStyles;
-  ui.setFont({ family: "sans-serif" });
+  __l10nSetFont({ family: "sans-serif" });
   ui.setTheme({
     fontSize: 16, smallSize: 14, headingSize: 24, padding: 8, spacing: 10, radius: 12,
     text: BASE.text!, muted: BASE["text-dim"]!, panel: "#101628", control: "#1c2440", hovered: "#2a3352",
@@ -33,7 +35,7 @@ export function applyTokens(hc: boolean): void {
   highContrast = hc;
   current = { ...BASE, ...(hc ? CONTRAST : {}) };
   ui.setTokens({ ...css.tokens, ...current });
-  ui.setStyles({
+  __l10nStyles({
     ...css.styles,
     label: { text: { color: "$text" } },
     paragraph: { text: { color: "$text" } },

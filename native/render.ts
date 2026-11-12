@@ -1,3 +1,5 @@
+// localization-runtime:attached
+import { localizedCanvasFont as __l10nCanvasFont } from "./l10n/font.ts";
 // The sky arena on starhermit:scene, as the browser build's js/render/scene.js
 // drew it with three.js r160: the gradient sky dome (sun glow and drifting
 // high haze when detailed), exponential fog, a hemisphere fill and the key
@@ -711,7 +713,7 @@ function nameSprite(name: string): Sprite {
   const g = c.getContext("2d")! as Ctx;
   g.fillStyle = "rgba(10,14,28,0.9)";
   g.beginPath(); g.roundRect(24, 8, 208, 44, 12); g.fill();
-  g.font = "bold 28px sans-serif";
+  g.font = __l10nCanvasFont("bold 28px sans-serif");
   g.textAlign = "center"; g.textBaseline = "middle";
   g.fillStyle = "#fff";
   g.fillText(name.slice(0, 12), 128, 31);
