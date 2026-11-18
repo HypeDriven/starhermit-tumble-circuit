@@ -1,3 +1,4 @@
+import { bindings } from "starhermit:input";
 import { localizedStyle as __l10nStyle } from "./l10n/font.ts";
 import { localizedDrawOptions as __l10nDrawOptions } from "./l10n/font.ts";
 // localization-runtime:attached
@@ -94,7 +95,7 @@ function card(id: string, title: string, sub: string, w: number, act: () => void
 }
 
 // ------------------------------------------------------------------ the frame
-export function drawScreens(): void {
+function drawScreensImmediate(): void {
   const L0 = layoutNow();
   const r = app.round;
   const playing = !!r && app.flow === "round";
@@ -531,3 +532,10 @@ function showOverPanel(w: number): void {
   ], w);
 }
 
+
+export function drawScreens(): void {
+  if (!(app.overlay === "help")) { drawScreensImmediate(); return; }
+  const actions = ["left","right","forward","back","jump","dive","pause"];
+  const version = JSON.stringify([(app as any).settings ?? (app as any).options ?? {}, (platform as any).options ?? {}, actions.map((action) => bindings(action))]);
+  ui.retain!("help-screen", version, drawScreensImmediate);
+}
