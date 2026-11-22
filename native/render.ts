@@ -119,6 +119,7 @@ export function applyLook(l: Look): void {
   look = l;
   renderer.shadowMap.enabled = l.shadows > 0;
   renderer.antialias = l.antialias;
+  renderer.motionBlur = l.bloom !== null ? { intensity: 0.25, samples: 8, maxPixels: 16, targetFps: 60, camera: false } : null;
   const ao = l.ao, hi = !!ao && ao.resolution >= 1; // the engine's "high": full-resolution AO
   renderer.ao = !ao ? null : {
     blendIntensity: 0.7, radius: 0.9, distanceExponent: 1.5, thickness: 1.5, scale: 1, samples: ao.samples,
