@@ -12,7 +12,7 @@
     "metadataSource": "starhermit.txt",
     "createdAt": "2026-09-01T09:42:51.108897+00:00",
     "coverArtSource": "manifest",
-    "coverArtUpdatedAt": "2026-11-26T22:56:32.112655+00:00",
+    "coverArtUpdatedAt": "2026-11-27T17:08:09.40113+00:00",
     "submittedByUserId": "2712e04e-461b-4d23-81ae-e40b429128a8",
     "submittedByUsername": "starhermit",
     "hosting": {
@@ -22,9 +22,9 @@
       "pinnedCommitSha": null,
       "deployedCommitSha": null,
       "deployError": null,
-      "deployedAt": "2026-11-26T22:56:32.101759+00:00",
+      "deployedAt": "2026-11-27T17:08:09.391064+00:00",
       "externalLaunchUrl": null,
-      "engineVersion": "1.51.0",
+      "engineVersion": "1.53.0",
       "deployWarning": null
     },
     "description": "Race through colorful obstacle courses, survive elimination rounds, and compete to reach the final.",
@@ -36,19 +36,19 @@
     "links": [],
     "isDisabled": false
   },
-  "publishedAt": "2026-11-26T22:56:32.481Z",
-  "sourceCommit": "ebed2230f6c11043465aa0799be209cda27e68c6",
-  "bytesReceived": 1991612,
-  "archiveSha256": "bf35b9b16f8585ed65d8642e7fdd73124fb17f32e7ac84415555c23bc15550d9",
+  "publishedAt": "2026-11-27T17:08:09.564Z",
+  "sourceCommit": "02acc54d9274f5a3ac85af8aceae56e30a09bea4",
+  "bytesReceived": 1991000,
+  "archiveSha256": "e0c955f10e1ecceb6f6b8874187cceb526d2074fa2e9c78e32eaf6ca48484877",
   "indexSha256": "233787818f4495a1108fab556f49ee7857661dfd720a1dc39a5609d62dbfadf0",
   "result": {
     "clientPublished": true,
     "serverImageLoaded": false,
     "imageDigest": null,
-    "bytesReceived": 1991612,
+    "bytesReceived": 1991000,
     "mode": "replace",
     "filesRemoved": 0,
-    "engineVersion": "1.51.0",
+    "engineVersion": "1.53.0",
     "deployWarning": null
   },
   "liveVerification": {
